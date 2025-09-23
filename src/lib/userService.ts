@@ -1,4 +1,4 @@
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { deleteDoc, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "./firebase";
 import { User } from "../types/users";
 
@@ -22,6 +22,23 @@ export async function getUserById(id: string) {
         return null;
     } catch (error) {
         console.error("Error getting user by id", error);
+        throw error;
+    }
+}
+
+export async function getUserByEmail(email: string) {
+    try {
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("email", "==", email));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+            const userDoc = querySnapshot.docs[0];
+            return { id: userDoc.id, ...userDoc.data() } as User;
+        }
+        return null;
+    } catch (error) {
+        console.error("Error getting user by email", error);
         throw error;
     }
 }

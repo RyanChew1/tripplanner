@@ -3,7 +3,7 @@ export interface User {
     firstName: string;
     lastName: string;
     email: string;
-    tier: "Free" | "Premium";
+    tier: "free" | "premium";
     image?: string;
     createdAt?: Date;
     updatedAt?: Date;

@@ -11,11 +11,10 @@ export default function LandingPage() {
   const router = useRouter();
   const [loaderComplete, setLoaderComplete] = useState(false);
 
-  // Ensure loader completes at least one full cycle (2 seconds)
   useEffect(() => {
     const timer = setTimeout(() => {
       setLoaderComplete(true);
-    }, 2000); // 2 seconds to match the loader animation duration
+    }, 2000);
 
     return () => clearTimeout(timer);
   }, []);

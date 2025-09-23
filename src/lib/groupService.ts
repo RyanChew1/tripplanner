@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, deleteDoc, arrayUnion } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, deleteDoc, arrayUnion, addDoc, collection, getDocs, where, query, or } from "firebase/firestore";
 import { db } from "./firebase";
 import { Group, GroupMember } from "../types/groups";
 
@@ -18,24 +18,24 @@ export async function getGroupById(id: string) {
 
 // Get all groups that a user is a member of
 export async function getUserGroups(userId: string) {
-    try {
-        const docRef = doc(db, "users", userId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-            return docSnap.data()?.groupMembers.map((member: GroupMember) => getGroupById(member.id)) || [];
-        }
-        return [];
-    } catch (error) {
-        console.error("Error getting user groups", error);
-        throw error;
-    }
-}
+    const roles = ["manager", "admin", "traveler"];
+    const groupsRef = collection(db, "groups");
+  
+    // Firestore supports `in` for up to 10 values
+    const q = query(
+      groupsRef,
+      where(`groupMembers.${userId}`, "in", roles)
+    );
+  
+    const snap = await getDocs(q);
+    return snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Group[];
+  }
 
 
 export async function createGroup(group: Group) {
     try {
-        const docRef = doc(db, "groups");
-        await setDoc(docRef, {...group, createdAt: serverTimestamp(), updatedAt: serverTimestamp()});
+        const docRef = collection(db, "groups");
+        await addDoc(docRef, {...group, createdAt: serverTimestamp(), updatedAt: serverTimestamp()});
         return getGroupById(docRef.id);
     } catch (error) {
         console.error("Error creating group", error);
