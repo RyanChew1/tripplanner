@@ -1,5 +1,4 @@
 export interface Group {
-
     id?: string;
     name: string;
     image?: string;
@@ -9,4 +8,6 @@ export interface Group {
     ownerId: string;
     tripIds: string[];
     invitedUsers: string[]; // List of email addresses
+    groupIcon?: string;
+    groupColor?: string;
 }
