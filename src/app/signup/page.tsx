@@ -27,8 +27,8 @@ const SignupPage = ({searchParams}: {searchParams: Promise<{isSignup: string}>})
     try {
       await signIn(email, password);
       router.push('/');
-    } catch (error: any) {
-      setError(error.message || 'Failed to sign in');
+    } catch (error: unknown) {
+      setError((error as Error).message || 'Failed to sign in');
     } finally {
       setLoading(false);
     }
@@ -42,8 +42,8 @@ const SignupPage = ({searchParams}: {searchParams: Promise<{isSignup: string}>})
     try {
       await signUp(email, password, firstName, lastName);
       router.push('/');
-    } catch (error: any) {
-      setError(error.message || 'Failed to sign up');
+    } catch (error: unknown) {
+      setError((error as Error).message || 'Failed to sign up');
     } finally {
       setLoading(false);
     }
@@ -56,8 +56,8 @@ const SignupPage = ({searchParams}: {searchParams: Promise<{isSignup: string}>})
     try {
       await signInWithGoogle();
       router.push('/');
-    } catch (error: any) {
-      setError(error.message || 'Failed to sign in with Google');
+    } catch (error: unknown) {
+      setError((error as Error).message || 'Failed to sign in with Google');
     } finally {
       setLoading(false);
     }

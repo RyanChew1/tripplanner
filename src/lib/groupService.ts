@@ -1,6 +1,6 @@
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, deleteDoc, arrayUnion, addDoc, collection, getDocs, where, query, or } from "firebase/firestore";
 import { db } from "./firebase";
-import { Group, GroupMember } from "../types/groups";
+import { Group } from "../types/groups";
 
 export async function getGroupById(id: string) {
     try {

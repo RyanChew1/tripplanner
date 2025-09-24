@@ -73,7 +73,13 @@ const GroupCard = ({ groupId }: { groupId: string }) => {
         <div className="flex flex-row items-center gap-x-2 self-end">
           <div className="text-sm text-gray-700 font-semibold">
             {/* capitalize first letter */}
-            {group.data?.groupMembers[user?.uid || ""]?.charAt(0).toUpperCase() + group.data?.groupMembers[user?.uid || ""]?.slice(1) || "Traveler"}
+            {(() => {
+              const role = group.data?.groupMembers?.[user?.uid || ""];
+              if (role && typeof role === "string" && role.length > 0) {
+                return role.charAt(0).toUpperCase() + role.slice(1);
+              }
+              return "Traveler";
+            })()}
           </div>
         </div>
       </div>
