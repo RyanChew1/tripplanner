@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getUserById, updateUser, deleteUser } from "../lib/userService";
+import { getUserById, updateUser, deleteUser, addPinnedGroup, removePinnedGroup, reorderPinnedGroups } from "../lib/userService";
 import { User } from "../types/users";
 
 export function useGetUser(id: string) {
@@ -34,6 +34,54 @@ export function useDeleteUser(id: string) {
         },
         onError: (error) => {
             console.error("Error deleting user", error);
+        },
+    });
+}
+
+export function useAddPinnedGroup() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ userId, groupId }: { userId: string, groupId: string }) => {
+            await addPinnedGroup(userId, groupId);
+            return userId;
+        },
+        onSuccess: (userId: string) => {
+            queryClient.invalidateQueries({ queryKey: ["user", userId] });
+        },
+        onError: (error) => {
+            console.error("Error adding pinned group", error);
+        },
+    });
+}
+
+export function useRemovePinnedGroup() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ userId, groupId }: { userId: string, groupId: string }) => {
+            await removePinnedGroup(userId, groupId);
+            return userId;
+        },
+        onSuccess: (userId: string) => {
+            queryClient.invalidateQueries({ queryKey: ["user", userId] });
+        },
+        onError: (error) => {
+            console.error("Error removing pinned group", error);
+        },
+    });
+}
+
+export function useReorderPinnedGroups() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ userId, groupIds }: { userId: string, groupIds: string[] }) => {
+            await reorderPinnedGroups(userId, groupIds);
+            return userId;
+        },
+        onSuccess: (userId: string) => {
+            queryClient.invalidateQueries({ queryKey: ["user", userId] });
+        },
+        onError: (error) => {
+            console.error("Error reordering pinned groups", error);
         },
     });
 }

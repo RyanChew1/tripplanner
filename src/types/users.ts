@@ -10,4 +10,5 @@ export interface User {
     home: string;
     bucketListLocationIds: string[];
     bucketListActivities: string[];
+    pinnedGroups: string[];
 }

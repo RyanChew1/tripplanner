@@ -48,10 +48,10 @@ import { useCreateGroup, useUserGroups } from "@/hooks/useGroups";
 import { getUserByEmail } from "@/lib/userService";
 import { TravelIconSelector, TravelIcons } from "@/lib/iconList";
 import { Group } from "@/types/groups";
+import { useGetUser } from "@/hooks/useUser";
 
 const HomePage = () => {
   const { user, loading } = useAuth();
-  const [loaderComplete, setLoaderComplete] = useState(false);
   const [createGroupDialogOpen, setCreateGroupDialogOpen] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [emailInput, setEmailInput] = useState("");
@@ -77,6 +77,7 @@ const HomePage = () => {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   const createGroupMutation = useCreateGroup();
+  const { data: userData } = useGetUser(user?.uid || "");
 
   // Only call useUserGroups when user is loaded and has a valid UID
   const { data: userGroups, isLoading: isLoadingUserGroups } = useUserGroups(
@@ -111,8 +112,11 @@ const HomePage = () => {
         return false;
       }
 
-      // Role filters
-      if (Object.values(roleFilters).some((checked) => checked)) {
+      // Check if any role filters are selected (excluding pinned)
+      const hasRoleFilters = roleFilters.manager || roleFilters.admin || roleFilters.traveler;
+      
+      // Role filters (only apply if role filters are selected)
+      if (hasRoleFilters) {
         const userRole = group.groupMembers[user?.uid || ""];
         const hasRoleFilter =
           (roleFilters.manager && userRole === "manager") ||
@@ -122,12 +126,16 @@ const HomePage = () => {
         if (!hasRoleFilter) return false;
       }
 
-      // Pinned filter (placeholder - no functionality yet)
+      // Pinned filter (only apply if pinned filter is selected)
       if (roleFilters.pinned) {
-        // TODO: Implement pinned functionality
+        if (userData?.pinnedGroups?.length && userData?.pinnedGroups?.length > 0) {
+          if (userData?.pinnedGroups.includes(group?.id || "")) return true;
+          return false;
+        }
         return false;
       }
 
+      // If no filters are selected, show all groups
       return true;
     });
 
@@ -167,7 +175,7 @@ const HomePage = () => {
     });
 
     return filtered;
-  }, [userGroups, searchQuery, roleFilters, sortBy, sortOrder, user?.uid]);
+  }, [userGroups, searchQuery, roleFilters, sortBy, sortOrder, user?.uid, userData?.pinnedGroups]);
 
   // Email validation function
   const isValidEmail = (email: string): boolean => {
@@ -366,15 +374,7 @@ const HomePage = () => {
     }
   };
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoaderComplete(true);
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (loading || !loaderComplete || isLoadingUserGroups) {
+  if (loading || isLoadingUserGroups) {
     return (
       <div className="min-h-screen bg-gray-300 bg-opacity-50 flex items-center justify-center">
         <div className="flex items-center space-x-12">

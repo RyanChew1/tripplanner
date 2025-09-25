@@ -33,3 +33,34 @@ export function useCreateGroup() {
         },
     });
 }
+
+// Get pinned groups by their IDs
+export async function getPinnedGroups(groupIds: string[]) {
+    try {
+        if (!groupIds || groupIds.length === 0) {
+            return [];
+        }
+        
+        const groups = await Promise.all(
+            groupIds.map(async (id) => {
+                const group = await getGroupById(id);
+                return group ? { ...group, id } : null;
+            })
+        );
+        
+        return groups.filter(group => group !== null) as Group[];
+    } catch (error) {
+        console.error("Error getting pinned groups", error);
+        throw error;
+    }
+}
+
+export function usePinnedGroups(groupIds: string[]) {
+    return useQuery({
+        queryKey: ["pinnedGroups", groupIds],
+        queryFn: () => getPinnedGroups(groupIds),
+        enabled: groupIds.length > 0,
+        staleTime: 1000 * 60 * 5,
+        retry: false,
+    });
+}

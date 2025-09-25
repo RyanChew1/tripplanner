@@ -54,6 +54,7 @@ const createUserFromFirebaseUser = (firebaseUser: FirebaseUser): User => {
     home: '',
     bucketListLocationIds: [],
     bucketListActivities: [],
+    pinnedGroups: [],
   };
 };
 
@@ -124,6 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           home: '',
           bucketListLocationIds: [],
           bucketListActivities: [],
+          pinnedGroups: [],
         };
         
         await createUser(userDoc);

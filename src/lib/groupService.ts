@@ -75,3 +75,24 @@ export async function addUserToGroup(groupId: string, userId: string) {
         throw error;
     }
 }
+
+// Get pinned groups by their IDs
+export async function getPinnedGroups(groupIds: string[]) {
+    try {
+        if (!groupIds || groupIds.length === 0) {
+            return [];
+        }
+        
+        const groups = await Promise.all(
+            groupIds.map(async (id) => {
+                const group = await getGroupById(id);
+                return group ? { ...group, id } : null;
+            })
+        );
+        
+        return groups.filter(group => group !== null) as Group[];
+    } catch (error) {
+        console.error("Error getting pinned groups", error);
+        throw error;
+    }
+}

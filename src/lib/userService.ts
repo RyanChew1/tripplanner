@@ -1,4 +1,4 @@
-import { deleteDoc, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { deleteDoc, doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, arrayUnion, arrayRemove } from "firebase/firestore";
 import { db } from "./firebase";
 import { User } from "../types/users";
 
@@ -66,6 +66,44 @@ export async function deleteUser(id: string) {
         await deleteDoc(docRef);
     } catch (error) {
         console.error("Error deleting user", error);
+        throw error;
+    }
+}
+
+
+export async function addPinnedGroup(userId: string, groupId: string) {
+    try {
+        const docRef = doc(db, "users", userId);
+        await updateDoc(docRef, {
+            pinnedGroups: arrayUnion(groupId)
+        });
+    } catch (error) {
+        console.error("Error adding pinned group", error);
+        throw error;
+    }
+}
+
+export async function removePinnedGroup(userId: string, groupId: string) {
+
+    try {
+        const docRef = doc(db, "users", userId);
+        await updateDoc(docRef, {
+            pinnedGroups: arrayRemove(groupId)
+        });
+    } catch (error) {
+        console.error("Error removing pinned group", error);
+        throw error;
+    }
+}
+
+export async function reorderPinnedGroups(userId: string, groupIds: string[]) {
+    try {
+        const docRef = doc(db, "users", userId);
+        await updateDoc(docRef, {
+            pinnedGroups: groupIds
+        });
+    } catch (error) {
+        console.error("Error reordering pinned groups", error);
         throw error;
     }
 }

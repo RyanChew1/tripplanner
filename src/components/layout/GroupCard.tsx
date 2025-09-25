@@ -3,8 +3,9 @@ import { useGetGroupById } from "@/hooks/useGroups";
 import { TravelIcons } from "@/lib/iconList";
 import { useRouter } from "next/navigation";
 import CustomLoader from "../CustomLoader";
+import { Pin } from "lucide-react";
 
-const GroupCard = ({ groupId }: { groupId: string }) => {
+const GroupCard = ({ groupId, isPinned, handlePinGroup }: { groupId: string, isPinned: boolean, handlePinGroup: () => void }) => {
   const router = useRouter();
   const group = useGetGroupById(groupId);
   const { user, loading } = useAuth();
@@ -19,6 +20,11 @@ const GroupCard = ({ groupId }: { groupId: string }) => {
 
   if (loading) {
     return <CustomLoader />;
+  }
+
+  const handleClickPin = (e: React.MouseEvent<SVGSVGElement>) => {
+    e.stopPropagation();
+    handlePinGroup();
   }
 
   return (
@@ -70,18 +76,25 @@ const GroupCard = ({ groupId }: { groupId: string }) => {
             </div>
           </div>
         </div>
-        <div className="flex flex-row items-center gap-x-2 self-end">
-          <div className="text-sm text-gray-700 font-semibold">
-            {/* capitalize first letter */}
-            {(() => {
-              const role = group.data?.groupMembers?.[user?.uid || ""];
-              if (role && typeof role === "string" && role.length > 0) {
-                return role.charAt(0).toUpperCase() + role.slice(1);
-              }
-              return "Traveler";
-            })()}
+
+        <div className="flex flex-row items-center gap-x-2 w-full justify-between">
+          {/* Pin button */}
+          <div className="text-sm mt-3 text-gray-700 font-semibold self-start">
+            <Pin className={`w-5 h-5 ${isPinned ? "text-blue-500 fill-blue-500" : "text-gray-700 fill-none"}`} onClick={handleClickPin} />
           </div>
+          <div className="text-sm text-gray-700 font-semibold self-end">
+          {/* capitalize first letter */}
+          {(() => {
+            const role = group.data?.groupMembers?.[user?.uid || ""];
+            if (role && typeof role === "string" && role.length > 0) {
+              return role.charAt(0).toUpperCase() + role.slice(1);
+            }
+            return "Traveler";
+          })()}
         </div>
+        </div>
+
+        
       </div>
     </div>
   );
