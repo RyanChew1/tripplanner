@@ -85,6 +85,7 @@ const DraggableGroupItem = ({
           className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
           style={{ backgroundColor: group.groupColor as string || "#6A8D73"}}
         >
+          
           <div
             className="w-5 h-5 text-white"
             dangerouslySetInnerHTML={{
