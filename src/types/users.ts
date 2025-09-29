@@ -5,8 +5,14 @@ export interface User {
     email: string;
     tier: "free" | "premium";
     image?: string;
-    createdAt?: Date;
-    updatedAt?: Date;
+    createdAt?: {
+        seconds: number;
+        nanoseconds: number;
+    };
+    updatedAt?: {
+        seconds: number;
+        nanoseconds: number;
+    };
     home: string;
     bucketListLocationIds: string[];
     bucketListActivities: string[];

@@ -2,17 +2,19 @@
 import { Message, SendMessageData } from '@/types/conversation';
 import { useConversation } from '@/hooks/useConversation';
 import { ConversationService } from '@/lib/conversationService';
+import { User as UserType} from '@/types/users';
 import { User } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Send, MessageCircle } from 'lucide-react';
+import { Timestamp } from 'firebase/firestore';
 
 interface GroupChatProps {
   conversationService: ConversationService;
   currentUser: User | null;
   groupId: string;
   groupMembers: Record<string, string>;
-  memberMap: Map<string, any>;
+  memberMap: Map<string, UserType>;
 }
 
 export const GroupChat: React.FC<GroupChatProps> = ({
@@ -71,7 +73,8 @@ export const GroupChat: React.FC<GroupChatProps> = ({
     try {
       const messageData: SendMessageData = {
         text: newMessage.trim(),
-        type: 'text'
+        type: 'text',
+        senderId: currentUser.uid
       };
       await sendMessage(conversationId, messageData);
       setNewMessage('');
@@ -80,9 +83,9 @@ export const GroupChat: React.FC<GroupChatProps> = ({
     }
   };
 
-  const formatMessageTime = (timestamp: any) => {
+  const formatMessageTime = (timestamp: Timestamp) => {
     if (!timestamp) return '';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp.toDate());
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 

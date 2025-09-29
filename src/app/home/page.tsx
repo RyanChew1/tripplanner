@@ -142,13 +142,13 @@ const HomePage = () => {
           comparison = a.name.localeCompare(b.name);
           break;
         case "lastUpdated":
-          const aUpdated = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-          const bUpdated = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+          const aUpdated = a.updatedAt ? a.updatedAt.seconds : 0;
+          const bUpdated = b.updatedAt ? b.updatedAt.seconds : 0;
           comparison = aUpdated - bUpdated;
           break;
         case "lastCreated":
-          const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-          const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          const aCreated = a.createdAt ? a.createdAt.seconds : 0;
+          const bCreated = b.createdAt ? b.createdAt.seconds : 0;
           comparison = aCreated - bCreated;
           break;
         case "groupSize":

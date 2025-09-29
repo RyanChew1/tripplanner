@@ -91,8 +91,8 @@ export class ConversationService {
         .map(doc => ({
           id: doc.id,
           ...doc.data()
-        }))
-        .filter((conv: any) => conv.members && conv.members.includes(userId)) as Conversation[];
+        } as Conversation))
+        .filter((conv) => conv.members && conv.members.includes(userId));
       onConversationsUpdate(conversations);
     });
   }

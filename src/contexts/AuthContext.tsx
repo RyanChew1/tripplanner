@@ -49,8 +49,14 @@ const createUserFromFirebaseUser = (firebaseUser: FirebaseUser): User => {
     email: firebaseUser.email || '',
     tier: 'free',
     image: "",
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: {
+      seconds: new Date().getTime() / 1000,
+      nanoseconds: 0,
+    },
+    updatedAt: {
+      seconds: new Date().getTime() / 1000,
+      nanoseconds: 0,
+    },
     home: '',
     bucketListLocationIds: [],
     bucketListActivities: [],
@@ -121,8 +127,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           email: userCredential.user.email || '',
           tier: 'free',
           image: '',
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: {
+            seconds: new Date().getTime() / 1000,
+            nanoseconds: 0,
+          },
+          updatedAt: {
+            seconds: new Date().getTime() / 1000,
+            nanoseconds: 0,
+          },
           home: '',
           bucketListLocationIds: [],
           bucketListActivities: [],
