@@ -3,7 +3,7 @@
 import ProtectedLayout from "@/components/layout/ProtectedLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import CustomLoader from "@/components/CustomLoader";
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,14 +15,8 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import {  } from "@/components/ui/checkbox";
+
 import {
   DropdownMenu,
   DropdownMenuContent,

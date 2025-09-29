@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
-import { Home, Settings, LogOut, User, GripVertical } from "lucide-react";
+import { Home, Settings, LogOut, User, GripVertical, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { useGetUser, useReorderPinnedGroups } from "@/hooks/useUser";
+import { useGetUser, useReorderPinnedGroups, useRemovePinnedGroup } from "@/hooks/useUser";
 import { usePinnedGroups } from "@/hooks/useGroups";
 import CustomLoader from "../CustomLoader";
 import { TravelIcons } from "@/lib/iconList";
@@ -42,12 +42,14 @@ const DraggableGroupItem = ({
   group, 
   isActive, 
   onNavigate, 
-  travelIcons 
+  travelIcons,
+  onUnpin
 }: { 
   group: Group; 
   isActive: boolean; 
   onNavigate: (path: string) => void; 
   travelIcons: TravelIcons;
+  onUnpin: (groupId: string) => void;
 }) => {
   const {
     attributes,
@@ -63,6 +65,11 @@ const DraggableGroupItem = ({
     transition,
   };
 
+  const handleUnpin = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onUnpin(group.id as string);
+  };
+
   return (
     <li
       ref={setNodeRef}
@@ -72,7 +79,7 @@ const DraggableGroupItem = ({
         isDragging && "z-50 opacity-50"
       )}
     >
-      <button
+      <div
         onClick={() => onNavigate(`/groups/${group.id}`)}
         className={cn(
           "w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors duration-200 group",
@@ -94,14 +101,23 @@ const DraggableGroupItem = ({
           />
         </div>
         <span className="font-medium truncate flex-1">{group.name}</span>
-        <div
-          {...attributes}
-          {...listeners}
-          className="opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing p-1"
-        >
-          <GripVertical className="w-4 h-4 text-gray-400" />
+        <div className="flex items-center space-x-1">
+          <div
+            onClick={handleUnpin}
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-100 rounded"
+            title="Unpin group"
+          >
+            <X className="w-4 h-4 text-red-500" />
+          </div>
+          <div
+            {...attributes}
+            {...listeners}
+            className="opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing p-1"
+          >
+            <GripVertical className="w-4 h-4 text-gray-400" />
+          </div>
         </div>
-      </button>
+      </div>
     </li>
   );
 };
@@ -122,6 +138,15 @@ const Sidebar = () => {
 
   // Reorder pinned groups mutation
   const reorderPinnedGroups = useReorderPinnedGroups();
+  
+  // Add unpin functionality
+  const { mutate: removePinnedGroup } = useRemovePinnedGroup();
+
+  const handleUnpinGroup = (groupId: string) => {
+    if (user?.uid) {
+      removePinnedGroup({ userId: user.uid, groupId });
+    }
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -200,14 +225,14 @@ const Sidebar = () => {
         <h2 className="text-xl font-semibold text-gray-800">Trip Planner</h2>
       </div>
 
-      {/* Main Navigation */}
-      <nav className="flex-1 p-4">
+      {/* Navigation Area */}
+      <nav className="flex-1 overflow-y-auto p-4">
         <div className="space-y-6">
           {/* Static Navigation Items */}
           <ul className="space-y-2">
             {staticNavigationItems.map((item) => {
+              const Icon = item.icon;
               const isActive = pathname === item.path;
-
               return (
                 <li key={item.name}>
                   <button
@@ -219,7 +244,7 @@ const Sidebar = () => {
                         : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
                     )}
                   >
-                    <item.icon className="w-5 h-5" />
+                    <Icon className="w-5 h-5" />
                     <span className="font-medium">{item.name}</span>
                   </button>
                 </li>
@@ -254,6 +279,7 @@ const Sidebar = () => {
                           isActive={isActive}
                           onNavigate={handleNavigation}
                           travelIcons={travelIcons}
+                          onUnpin={handleUnpinGroup}
                         />
                       );
                     })}
@@ -278,56 +304,29 @@ const Sidebar = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-900 truncate">
-                      {user?.displayName ||
-                        user?.email?.split("@")[0] ||
-                        "User"}
+                      {user?.displayName || user?.email || "User"}
                     </p>
                     <p className="text-sm text-gray-500 truncate">
                       {user?.email}
                     </p>
                   </div>
                 </div>
-                <div className="flex self-end mr-5 mb-3 text-center px-3 rounded-md bg-blue_secondary text-white w-fit py-1">
-                  {(() => {
-                    const role = userData?.tier || "";
-                    if (role && typeof role === "string" && role.length > 0) {
-                      return role.charAt(0).toUpperCase() + role.slice(1) + " Plan";
-                    }
-                    return "Free Plan";
-                  })()}
-                </div>
               </div>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56">
-            <DropdownMenuItem
-              onClick={() => handleNavigation("/profile")}
-              className="cursor-pointer"
-            >
-              <div className="flex items-center space-x-2">
-                <User className="w-4 h-4" />
-                <span>View Profile</span>
-              </div>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuItem onClick={() => handleNavigation("/profile")}>
+              <User className="mr-2 h-4 w-4" />
+              <span>Profile</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleNavigation("/settings")}>
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Settings</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => handleNavigation("/settings")}
-              className="cursor-pointer"
-            >
-              <div className="flex items-center space-x-2">
-                <Settings className="w-4 h-4" />
-                <span>Settings</span>
-              </div>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={handleLogout}
-              className="cursor-pointer text-red-600 focus:text-red-600"
-            >
-              <div className="flex items-center space-x-2">
-                <LogOut className="w-4 h-4" />
-                <span>Logout</span>
-              </div>
+            <DropdownMenuItem onClick={handleLogout}>
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Log out</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, deleteDoc, arrayUnion, addDoc, collection, getDocs, where, query, or } from "firebase/firestore";
+import { doc, getDoc, updateDoc, serverTimestamp, deleteDoc, arrayUnion, addDoc, collection, getDocs, where, query } from "firebase/firestore";
 import { db } from "./firebase";
 import { Group } from "../types/groups";
 

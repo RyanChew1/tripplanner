@@ -82,6 +82,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (error) {
           // If getUserById fails, it might mean the user doesn't exist
           // In that case, create the user document
+          console.log('Error creating user document:', error);
           try {
             const userDoc = createUserFromFirebaseUser(firebaseUser);
             await createUser(userDoc);
