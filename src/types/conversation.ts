@@ -18,6 +18,7 @@ export interface Message {
 }
 
 export interface CreateConversationData {
+  id?: string;
   members: string[];
   lastMessage?: string;
 }

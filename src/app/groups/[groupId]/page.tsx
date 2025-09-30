@@ -129,6 +129,7 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
     createConversation,
     sendMessage,
     setCurrentConversationId,
+    getConversationByGroupId
   } = useConversation({
     conversationService,
     currentUser
@@ -238,27 +239,27 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
 
   // Create or find group conversation
   useEffect(() => {
-    if (!currentUser || !group || !memberIds.length) return;
+    const initializeGroupChat = async () => {
+      if (!currentUser || !group || !memberIds.length) return;
 
-    // Look for existing conversation with all group members
-    const groupConversation = conversations.find(conv => 
-      conv.members.length === memberIds.length && 
-      memberIds.every(memberId => conv.members.includes(memberId))
-    );
-
-    if (groupConversation) {
-      setGroupConversationId(groupConversation.id);
-      setCurrentConversationId(groupConversation.id);
-    } else if (memberIds.length > 1) {
-      // Create new group conversation
-      createConversation({ members: memberIds })
-        .then(conversationId => {
-          setGroupConversationId(conversationId);
-          setCurrentConversationId(conversationId);
-        })
-        .catch(error => console.error('Error creating group conversation:', error));
+      // Look for existing conversation with all group members
+      const groupConversation = await getConversationByGroupId(groupId);
+      console.log('groupConversation', groupConversation);
+      if (groupConversation) {
+        setGroupConversationId(groupConversation.id);
+        setCurrentConversationId(groupConversation.id);
+      } else if (memberIds.length > 1) {
+        // Create new group conversation
+        createConversation({ id: groupId, members: memberIds })
+          .then(conversationId => {
+            setGroupConversationId(conversationId);
+            setCurrentConversationId(conversationId);
+          })
+          .catch(error => console.error('Error creating group conversation:', error));
+      }
     }
-  }, [currentUser, group, memberIds, conversations, createConversation, setCurrentConversationId]);
+    initializeGroupChat();
+  }, [currentUser, group, memberIds, createConversation, setCurrentConversationId, getConversationByGroupId]);
 
   // Scroll to bottom when messages change
   useEffect(() => {

@@ -34,6 +34,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({
     messagesError,
     sendMessage,
     createConversation,
+    getConversationByGroupId,
     setCurrentConversationId
   } = useConversation({ conversationService, currentUser });
 
@@ -46,6 +47,14 @@ export const GroupChat: React.FC<GroupChatProps> = ({
       // For now, we'll create a new conversation each time
       // In a real app, you'd want to check if a conversation already exists
       try {
+        // check if conversation already exists
+        const conversation = await getConversationByGroupId(groupId);
+        if (conversation) {
+          setConversationId(conversation.id);
+          setCurrentConversationId(conversation.id);
+          return;
+        }
+
         const memberIds = Object.keys(groupMembers);
         const conversationId = await createConversation({
           members: memberIds,
@@ -59,7 +68,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({
     };
 
     initializeGroupChat();
-  }, [currentUser, groupId, groupMembers, createConversation, setCurrentConversationId]);
+  }, [currentUser, groupId, groupMembers, createConversation, setCurrentConversationId, getConversationByGroupId]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {

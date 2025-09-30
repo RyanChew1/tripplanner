@@ -23,7 +23,7 @@ interface UseConversationReturn {
   createConversation: (data: CreateConversationData) => Promise<string>;
   sendMessage: (conversationId: string, data: SendMessageData) => Promise<void>;
   markMessagesAsRead: (conversationId: string, messageIds: string[]) => Promise<void>;
-  
+  getConversationByGroupId: (groupId: string) => Promise<Conversation | null>;
   // State management
   setCurrentConversationId: (conversationId: string | null) => void;
   currentConversationId: string | null;
@@ -151,6 +151,12 @@ export const useConversation = ({
     }
   }, [conversationService, currentUser]);
 
+  // Get conversation by group id
+
+  const getConversationByGroupId = useCallback(async (groupId: string): Promise<Conversation | null> => {
+    return await conversationService.getConversationByGroupId(groupId);
+  }, [conversationService]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -178,6 +184,7 @@ export const useConversation = ({
     createConversation,
     sendMessage,
     markMessagesAsRead,
+    getConversationByGroupId,
     
     // State management
     setCurrentConversationId,

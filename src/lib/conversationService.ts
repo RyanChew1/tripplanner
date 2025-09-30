@@ -8,7 +8,10 @@
   orderBy, 
   serverTimestamp,
   writeBatch,
-  Firestore
+  Firestore,
+  getDocs,
+  where,
+  setDoc
 } from 'firebase/firestore';
 import { Conversation, Message, CreateConversationData, SendMessageData } from '../types/conversation';
 
@@ -23,14 +26,23 @@ export class ConversationService {
    * Create a new conversation
    */
   async createConversation(data: CreateConversationData): Promise<string> {
+    console.log('createConversation', data);
     const conversationData = {
       ...data,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
 
-    const docRef = await addDoc(collection(this.db, 'conversations'), conversationData);
-    return docRef.id;
+    await setDoc(doc(this.db, 'conversations', data.id || ''), conversationData);
+    return data.id || '';
+  }
+
+  // Get conversation by group id
+  async getConversationByGroupId(groupId: string): Promise<Conversation | null> {
+    const conversationsRef = collection(this.db, 'conversations');
+    const q = query(conversationsRef, where('groupId', '==', groupId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))[0] as Conversation | null;
   }
 
   /**
