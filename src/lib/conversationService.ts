@@ -11,9 +11,13 @@
   Firestore,
   getDocs,
   where,
-  setDoc
+  setDoc,
+  arrayUnion,
+  arrayRemove,
+  FieldValue,
+  Timestamp
 } from 'firebase/firestore';
-import { Conversation, Message, CreateConversationData, SendMessageData } from '../types/conversation';
+import { Conversation, Message, CreateConversationData, SendMessageData, CreatePollData, VoteData } from '../types/conversation';
 
 export class ConversationService {
   private db: Firestore;
@@ -26,7 +30,6 @@ export class ConversationService {
    * Create a new conversation
    */
   async createConversation(data: CreateConversationData): Promise<string> {
-    console.log('createConversation', data);
     const conversationData = {
       ...data,
       createdAt: serverTimestamp(),
@@ -64,9 +67,185 @@ export class ConversationService {
     // Update conversation with last message
     const conversationRef = doc(this.db, 'conversations', conversationId);
     await updateDoc(conversationRef, {
-      lastMessage: data.text,
+      lastMessage: data.text || (data.type === 'poll' ? 'Poll created' : 'Message'),
       updatedAt: serverTimestamp()
     });
+  }
+
+  /**
+   * Create a poll in a conversation
+   */
+  async createPoll(conversationId: string, data: CreatePollData, senderId: string): Promise<void> {
+    const poll: Message['poll'] = {
+      question: data.question,
+      options: data.options.map(option => ({
+        ...option,
+        votes: []
+      })),
+      allowMultiple: data.allowMultiple || false,
+      expiresAt: data.expiresAt ? Timestamp.fromDate(data.expiresAt) : undefined
+    };
+
+    const messageData: SendMessageData = {
+      senderId: senderId,
+      type: 'poll',
+      poll
+    };
+
+    await this.sendMessage(conversationId, messageData);
+  }
+
+  /**
+   * Vote on a poll option
+   */
+  async voteOnPoll(
+    conversationId: string, 
+    messageId: string, 
+    optionId: string, 
+    userId: string
+  ): Promise<void> {
+    const messageRef = doc(this.db, 'conversations', conversationId, 'messages', messageId);
+    
+    // Get the current message to find the option index
+    const messageDoc = await this.getMessageById(conversationId, messageId);
+    if (!messageDoc || !messageDoc.poll) {
+      throw new Error('Poll not found');
+    }
+
+    // Find the option index by optionId
+    const optionIndex = messageDoc.poll.options.findIndex(option => option.id === optionId);
+    if (optionIndex === -1) {
+      throw new Error('Poll option not found');
+    }
+
+    // Check if user has already voted on this option
+    if (messageDoc.poll.options[optionIndex].votes.includes(userId)) {
+      throw new Error('User has already voted on this option');
+    }
+
+    // Check if poll allows multiple votes or if user hasn't voted on any option
+    if (!messageDoc.poll.allowMultiple) {
+      const hasVoted = messageDoc.poll.options.some(option => option.votes.includes(userId));
+      if (hasVoted) {
+        throw new Error('User has already voted on this poll and multiple votes are not allowed');
+      }
+    }
+
+    // Create updated options array with the new vote
+    const updatedOptions = [...messageDoc.poll.options];
+    updatedOptions[optionIndex] = {
+      ...updatedOptions[optionIndex],
+      votes: [...updatedOptions[optionIndex].votes, userId]
+    };
+
+    // Update the entire poll options array
+    await updateDoc(messageRef, {
+      'poll.options': updatedOptions
+    });
+  }
+
+  /**
+   * Remove a vote from a poll
+   */
+  async removeVoteFromPoll(
+    conversationId: string, 
+    messageId: string, 
+    userId: string
+  ): Promise<void> {
+    const messageRef = doc(this.db, 'conversations', conversationId, 'messages', messageId);
+    
+    // Get the current message to find all options
+    const messageDoc = await this.getMessageById(conversationId, messageId);
+    if (!messageDoc || !messageDoc.poll) {
+      throw new Error('Poll not found');
+    }
+
+    // Create updated options array with user votes removed
+    const updatedOptions = messageDoc.poll.options.map(option => ({
+      ...option,
+      votes: option.votes.filter(vote => vote !== userId)
+    }));
+
+    // Check if user had any votes to remove
+    const hasVotes = messageDoc.poll.options.some(option => option.votes.includes(userId));
+    if (!hasVotes) {
+      throw new Error('No votes found to remove');
+    }
+
+    // Update the entire poll options array
+    await updateDoc(messageRef, {
+      'poll.options': updatedOptions
+    });
+  }
+
+  /**
+   * Get a specific message by ID
+   */
+  private async getMessageById(conversationId: string, messageId: string): Promise<Message | null> {
+    try {
+      const messageRef = doc(this.db, 'conversations', conversationId, 'messages', messageId);
+      const messageDoc = await getDocs(query(collection(this.db, 'conversations', conversationId, 'messages'), where('__name__', '==', messageId)));
+      
+      if (messageDoc.empty) return null;
+      
+      return {
+        id: messageDoc.docs[0].id,
+        ...messageDoc.docs[0].data()
+      } as Message;
+    } catch (error) {
+      console.error('Error getting message:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get poll results for a specific poll
+   */
+  async getPollResults(conversationId: string, messageId: string): Promise<{ optionId: string; text: string; votes: string[]; percentage: number }[]> {
+    const messageDoc = await this.getMessageById(conversationId, messageId);
+    if (!messageDoc || !messageDoc.poll) {
+      throw new Error('Poll not found');
+    }
+
+    const totalVotes = messageDoc.poll.options.reduce((sum, option) => sum + option.votes.length, 0);
+    
+    return messageDoc.poll.options.map(option => ({
+      optionId: option.id,
+      text: option.text,
+      votes: option.votes,
+      percentage: totalVotes > 0 ? (option.votes.length / totalVotes) * 100 : 0
+    }));
+  }
+
+  /**
+   * Check if a user has voted on a poll
+   */
+  async hasUserVoted(conversationId: string, messageId: string, userId: string): Promise<boolean> {
+    const messageDoc = await this.getMessageById(conversationId, messageId);
+    if (!messageDoc || !messageDoc.poll) {
+      return false;
+    }
+
+    return messageDoc.poll.options.some(option => option.votes.includes(userId));
+  }
+
+  /**
+   * Get user's votes for a poll (for multiple vote polls)
+   */
+  async getUserVotes(conversationId: string, messageId: string, userId: string): Promise<string[]> {
+    const messageDoc = await this.getMessageById(conversationId, messageId);
+    if (!messageDoc || !messageDoc.poll) {
+      return [];
+    }
+
+    const userVotes: string[] = [];
+    messageDoc.poll.options.forEach(option => {
+      if (option.votes.includes(userId)) {
+        userVotes.push(option.id);
+      }
+    });
+
+    return userVotes;
   }
 
   /**

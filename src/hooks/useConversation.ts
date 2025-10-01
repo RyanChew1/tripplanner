@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import { User } from 'firebase/auth';
 import { ConversationService } from '../lib/conversationService';
-import { Conversation, Message, CreateConversationData, SendMessageData } from '../types/conversation';
+import { Conversation, Message, CreateConversationData, SendMessageData, CreatePollData, VoteData } from '../types/conversation';
 
 interface UseConversationProps {
   conversationService: ConversationService;
@@ -24,6 +24,9 @@ interface UseConversationReturn {
   sendMessage: (conversationId: string, data: SendMessageData) => Promise<void>;
   markMessagesAsRead: (conversationId: string, messageIds: string[]) => Promise<void>;
   getConversationByGroupId: (groupId: string) => Promise<Conversation | null>;
+  createPoll: (conversationId: string, data: CreatePollData) => Promise<void>;
+  voteOnPoll: (conversationId: string, messageId: string, optionId: string) => Promise<void>;
+  removeVoteFromPoll: (conversationId: string, messageId: string) => Promise<void>;
   // State management
   setCurrentConversationId: (conversationId: string | null) => void;
   currentConversationId: string | null;
@@ -151,8 +154,49 @@ export const useConversation = ({
     }
   }, [conversationService, currentUser]);
 
-  // Get conversation by group id
+  // Create poll
+  const createPoll = useCallback(async (conversationId: string, data: CreatePollData): Promise<void> => {
+    if (!currentUser) {
+      throw new Error('User must be authenticated to create a poll');
+    }
 
+    try {
+      await conversationService.createPoll(conversationId, data, currentUser.uid);
+    } catch (error) {
+      console.error('Error creating poll:', error);
+      throw error;
+    }
+  }, [conversationService, currentUser]);
+
+  // Vote on poll
+  const voteOnPoll = useCallback(async (conversationId: string, messageId: string, optionId: string): Promise<void> => {
+    if (!currentUser) {
+      throw new Error('User must be authenticated to vote on a poll');
+    }
+
+    try {
+      await conversationService.voteOnPoll(conversationId, messageId, optionId, currentUser.uid);
+    } catch (error) {
+      console.error('Error voting on poll:', error);
+      throw error;
+    }
+  }, [conversationService, currentUser]);
+
+  // Remove vote from poll
+  const removeVoteFromPoll = useCallback(async (conversationId: string, messageId: string): Promise<void> => {
+    if (!currentUser) {
+      throw new Error('User must be authenticated to remove a vote');
+    }
+
+    try {
+      await conversationService.removeVoteFromPoll(conversationId, messageId, currentUser.uid);
+    } catch (error) {
+      console.error('Error removing vote from poll:', error);
+      throw error;
+    }
+  }, [conversationService, currentUser]);
+
+  // Get conversation by group id
   const getConversationByGroupId = useCallback(async (groupId: string): Promise<Conversation | null> => {
     return await conversationService.getConversationByGroupId(groupId);
   }, [conversationService]);
@@ -185,6 +229,9 @@ export const useConversation = ({
     sendMessage,
     markMessagesAsRead,
     getConversationByGroupId,
+    createPoll,
+    voteOnPoll,
+    removeVoteFromPoll,
     
     // State management
     setCurrentConversationId,

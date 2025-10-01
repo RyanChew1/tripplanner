@@ -31,6 +31,8 @@ import { ConversationService } from '@/lib/conversationService';
 import { useConversation } from '@/hooks/useConversation';
 import { db } from '@/lib/firebase';
 import { Timestamp } from 'firebase/firestore';
+import { CreatePollData } from '@/types/conversation';
+import { GroupChat } from '@/components/GroupChat';
 
 interface GroupUpdateData {
   name?: string;
@@ -244,7 +246,6 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
 
       // Look for existing conversation with all group members
       const groupConversation = await getConversationByGroupId(groupId);
-      console.log('groupConversation', groupConversation);
       if (groupConversation) {
         setGroupConversationId(groupConversation.id);
         setCurrentConversationId(groupConversation.id);
@@ -599,83 +600,14 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
             </div>
 
             {/* Group Chat */}
-            <div className='bg-white rounded-lg shadow-sm border p-6'>
-              <div className='flex items-center mb-4'>
-                <MessageCircle className='h-5 w-5 mr-2 text-blue-500' />
-                <h2 className='text-xl font-semibold'>Group Chat</h2>
-              </div>
-              
-              {/* Chat Messages */}
-              <div className='h-80 border rounded-lg p-4 mb-4 overflow-y-auto bg-gray-50'>
-                {messagesLoading ? (
-                  <div className='flex items-center justify-center h-full'>
-                    <div className='text-gray-500'>Loading messages...</div>
-                  </div>
-                ) : messages.length > 0 ? (
-                  <div className='space-y-3'>
-                    {messages.map((message) => {
-                      const sender = memberMap.get(message.senderId);
-                      const isOwnMessage = message.senderId === currentUser?.uid;
-                      const senderName = sender ? `${sender.firstName} ${sender.lastName}`.trim() : 'Unknown User';
-                      const senderInitials = sender ? `${sender.firstName.charAt(0)}${sender.lastName.charAt(0)}`.toUpperCase() : '?';
-                      
-                      return (
-                        <div key={message.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`flex items-start space-x-2 max-w-xs lg:max-w-md ${isOwnMessage ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                            <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0">
-                              {senderInitials}
-                            </div>
-                            <div className={`rounded-lg p-3 ${isOwnMessage ? 'bg-blue-500 text-white' : 'bg-white border'}`}>
-                              <div className={`text-xs mb-1 ${isOwnMessage ? 'text-blue-100' : 'text-gray-500'}`}>
-                                {isOwnMessage ? 'You' : senderName}
-                              </div>
-                              <p className='text-sm'>{message.text}</p>
-                              <div className={`text-xs mt-1 ${isOwnMessage ? 'text-blue-100' : 'text-gray-400'}`}>
-                                {formatMessageTime(message.createdAt)}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    <div ref={messagesEndRef} />
-                  </div>
-                ) : (
-                  <div className='flex items-center justify-center h-full text-gray-500'>
-                    <div className='text-center'>
-                      <MessageCircle className='h-8 w-8 mx-auto mb-2 text-gray-400' />
-                      <p>No messages yet</p>
-                      <p className='text-sm'>Start a conversation with your group!</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Message Input */}
-              <div className='flex space-x-2'>
-                <Input
-                  value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
-                  onKeyPress={handleChatKeyPress}
-                  placeholder='Type a message...'
-                  className='flex-1'
-                  disabled={!groupConversationId}
-                />
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={!messageInput.trim() || !groupConversationId}
-                  className='px-4 py-2 bg-blue-500 text-white hover:bg-blue-600'
-                >
-                  <Send className='h-4 w-4' />
-                </Button>
-              </div>
-              
-              {!groupConversationId && (
-                <p className='text-sm text-gray-500 mt-2'>
-                  Chat will be available once the group has multiple members.
-                </p>
-              )}
-            </div>
+            <GroupChat
+              conversationService={conversationService}
+              currentUser={currentUser}
+              groupId={groupId}
+              groupMembers={group?.groupMembers || {}}
+              memberMap={memberMap}
+              canManageGroup={canManageGroup}
+            />
           </div>
         );
 
