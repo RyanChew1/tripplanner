@@ -690,6 +690,7 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
                   {['Invite Members', 'Create Trip', 'Share Group'].map((action, i) => (
                     <div key={i} className='h-10 bg-gray-200 rounded animate-pulse w-full'></div>
                   ))}
+
                 </div>
               </div>
             </div>

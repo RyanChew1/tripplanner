@@ -114,6 +114,10 @@ export function hasValidTokens(user: User): boolean {
 /**
  * Transform calendar event to Google Calendar format
  */
+
+
+
+
 function transformCalendarEvent(event: CalendarEvent): any {
   const startDateTime = new Date(event.startDate.date);
   const endDateTime = new Date(event.endDate.date);

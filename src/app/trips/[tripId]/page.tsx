@@ -651,7 +651,7 @@ const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
               </div>
             </div>
 
-            {/* Saved Flights */}
+            {/* Saved Flights  */}
             {trip.flights && trip.flights.length > 0 && (
               <div className='bg-white rounded-lg shadow-sm border p-6'>
                 <div className='flex items-center space-x-2 mb-4'>
@@ -668,6 +668,7 @@ const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
                               <div className='text-lg font-bold text-blue-600'>
                                 {formatFlightTime(flight.itineraries[0]?.segments[0]?.departure.at)}
                               </div>
+
                               <div className='text-sm text-gray-500'>
                                 {flight.itineraries[0]?.segments[0]?.departure.iataCode}
                               </div>
