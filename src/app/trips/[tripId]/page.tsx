@@ -1416,7 +1416,7 @@ const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
                 )}
                 
                 <p className='text-xs text-gray-500'>
-                  Export all trip events, flights, and hotels to your Google Calendar
+                  Export your trip events, flights, and hotels to your Google Calendar (only events you&apos;re participating in)
                 </p>
               </div>
             </div>

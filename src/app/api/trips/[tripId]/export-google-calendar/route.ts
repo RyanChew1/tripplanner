@@ -71,13 +71,20 @@ export async function POST(
     }
 
     // Get calendar events
-    const calendarEvents = trip.calendarId ? await getCalendarEvents(trip.calendarId) : [];
+    const allCalendarEvents = trip.calendarId ? await getCalendarEvents(trip.calendarId) : [];
+    
+    // Filter events to only include those where the current user is a participant
+    const userCalendarEvents = allCalendarEvents.filter(event => 
+      event.memberIds && event.memberIds.includes(userId)
+    );
+
+    console.log(`Filtering events: ${allCalendarEvents.length} total, ${userCalendarEvents.length} for user ${userId}`);
 
     // Export to Google Calendar
     const result = await exportTripToGoogleCalendar(
       user,
       trip,
-      calendarEvents,
+      userCalendarEvents,
       trip.flights || [],
       trip.hotels || []
     );
@@ -86,7 +93,7 @@ export async function POST(
       return NextResponse.json({
         success: true,
         eventsCreated: result.eventsCreated,
-        message: `Successfully added ${result.eventsCreated} events to your Google Calendar`,
+        message: `Successfully added ${result.eventsCreated} events to your Google Calendar (only events you're participating in)`,
       });
     } else {
       return NextResponse.json(
