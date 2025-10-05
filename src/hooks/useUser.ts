@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getUserById, updateUser, deleteUser, addPinnedGroup, removePinnedGroup, reorderPinnedGroups } from "../lib/userService";
+import { getUserById, updateUser, deleteUser, addPinnedGroup, removePinnedGroup, reorderPinnedGroups, validateUserSubscription } from "../lib/userService";
 import { User } from "../types/users";
 
 export function useGetUser(id: string) {
@@ -7,7 +7,7 @@ export function useGetUser(id: string) {
         queryKey: ["user", id],
         queryFn: () => getUserById(id),
         enabled: !!id,
-        staleTime: 1000 * 60 * 5,
+        staleTime: 1000 * 60 * 5, // 5 minutes
         retry: false,
     });
 }

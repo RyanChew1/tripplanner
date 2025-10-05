@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
-import { Home, Settings, LogOut, User, GripVertical, X } from "lucide-react";
+import { Home, Settings, LogOut, User, GripVertical, X, CreditCard } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useGetUser, useReorderPinnedGroups, useRemovePinnedGroup } from "@/hooks/useUser";
 import { usePinnedGroups } from "@/hooks/useGroups";
+import { useAccessControl } from "@/hooks/useAccessControl";
 import CustomLoader from "../CustomLoader";
 import { TravelIcons } from "@/lib/iconList";
 import {
@@ -126,6 +127,7 @@ const Sidebar = () => {
   const { user, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const { canAccessGroup } = useAccessControl();
 
   const { data: userData, isLoading: loadingUser } = useGetUser(
     user?.uid || ""
@@ -186,9 +188,24 @@ const Sidebar = () => {
       icon: Home,
       path: "/home",
     },
+    {
+      name: "Billing",
+      icon: CreditCard,
+      path: "/billing",
+    },
   ], []);
 
   const handleNavigation = (path: string) => {
+    // Check if navigating to a group page
+    if (path.startsWith('/groups/')) {
+      const groupId = path.split('/groups/')[1];
+      if (!canAccessGroup(groupId)) {
+        // Redirect to billing page if access is denied
+        router.push('/billing');
+        return;
+      }
+    }
+    
     router.push(path);
   };
 
@@ -222,7 +239,7 @@ const Sidebar = () => {
     <div className="h-screen w-64 bg-white border-r border-gray-200 flex flex-col">
       {/* Logo/Brand Area */}
       <div className="p-6 border-b border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-800">Trip Planner</h2>
+        <h2 className="text-3xl text-blue-500 italic font-extrabold">UNIVO</h2>
       </div>
 
       {/* Navigation Area */}

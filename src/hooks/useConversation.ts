@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import { User } from 'firebase/auth';
 import { ConversationService } from '../lib/conversationService';
-import { Conversation, Message, CreateConversationData, SendMessageData, CreatePollData, VoteData } from '../types/conversation';
+import { Conversation, Message, CreateConversationData, SendMessageData, CreatePollData } from '../types/conversation';
 
 interface UseConversationProps {
   conversationService: ConversationService;

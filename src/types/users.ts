@@ -17,4 +17,6 @@ export interface User {
     bucketListLocationIds: string[];
     bucketListActivities: string[];
     pinnedGroups: string[];
+    stripeCustomerId?: string;
+    subscriptionId?: string;
 }

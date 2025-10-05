@@ -55,7 +55,6 @@ export const GroupChat: React.FC<GroupChatProps> = ({
     sendMessage,
     createConversation,
     createPoll,
-    voteOnPoll,
     removeVoteFromPoll,
     getConversationByGroupId,
     setCurrentConversationId
@@ -139,15 +138,6 @@ export const GroupChat: React.FC<GroupChatProps> = ({
     }
   };
 
-  const handleVoteOnPoll = async (messageId: string, optionId: string) => {
-    if (!conversationId) return;
-
-    try {
-      await voteOnPoll(conversationId, messageId, optionId);
-    } catch (error) {
-      console.error('Error voting on poll:', error);
-    }
-  };
 
   const handleRemoveVote = async (messageId: string) => {
     if (!conversationId) return;

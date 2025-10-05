@@ -12,12 +12,9 @@
   getDocs,
   where,
   setDoc,
-  arrayUnion,
-  arrayRemove,
-  FieldValue,
   Timestamp
 } from 'firebase/firestore';
-import { Conversation, Message, CreateConversationData, SendMessageData, CreatePollData, VoteData } from '../types/conversation';
+import { Conversation, Message, CreateConversationData, SendMessageData, CreatePollData } from '../types/conversation';
 
 export class ConversationService {
   private db: Firestore;
@@ -183,7 +180,6 @@ export class ConversationService {
    */
   private async getMessageById(conversationId: string, messageId: string): Promise<Message | null> {
     try {
-      const messageRef = doc(this.db, 'conversations', conversationId, 'messages', messageId);
       const messageDoc = await getDocs(query(collection(this.db, 'conversations', conversationId, 'messages'), where('__name__', '==', messageId)));
       
       if (messageDoc.empty) return null;

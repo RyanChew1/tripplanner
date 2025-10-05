@@ -3,7 +3,7 @@
 import ProtectedLayout from "@/components/layout/ProtectedLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import CustomLoader from "@/components/CustomLoader";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -43,9 +43,14 @@ import { getUserByEmail } from "@/lib/userService";
 import { TravelIconSelector, TravelIcons } from "@/lib/iconList";
 import { Group } from "@/types/groups";
 import { useGetUser } from "@/hooks/useUser";
+import LimitedAction from "@/components/LimitedAction";
+import UsageIndicator from "@/components/UsageIndicator";
+import AccessTest from "@/components/AccessTest";
+import { useUserLimits } from "@/hooks/useLimits";
 
 const HomePage = () => {
   const { user, loading } = useAuth();
+  const { userTier, groupLimitReached, tripLimitReached } = useUserLimits();
   const [createGroupDialogOpen, setCreateGroupDialogOpen] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [emailInput, setEmailInput] = useState("");
@@ -400,15 +405,27 @@ const HomePage = () => {
           travel groups.
         </p>
 
+        {/* Usage Indicator for Free Users */}
+        <UsageIndicator className="mb-4" />
+        
+        {/* Access Control Test - Only show for free users who have surpassed limits */}
+        {userTier === 'free' && (groupLimitReached || tripLimitReached) && (
+          <AccessTest />
+        )}
+
         {/* Search and Filter Controls */}
         <div className="space-y-4 w-full">
-          <Button
-            className="bg-green_primary text-white my-3"
-            onClick={() => setCreateGroupDialogOpen(true)}
+          <LimitedAction
+            actionType="groups"
+            onAction={() => setCreateGroupDialogOpen(true)}
           >
-            <Plus />
-            Create Group
-          </Button>
+            <Button
+              className="bg-green_primary text-white my-3"
+            >
+              <Plus />
+              Create Group
+            </Button>
+          </LimitedAction>
           {/* Search Bar and Filter Buttons */}
           <div className="flex gap-4 items-center flex-wrap mb-7">
             <div className="relative flex-1 max-w-md">

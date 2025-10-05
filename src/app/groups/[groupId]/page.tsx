@@ -9,6 +9,7 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { User } from '@/types/users';
 import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { X, Plus, MoreVertical, Edit2, Send, MessageCircle } from 'lucide-react';
+import { X, Plus, MoreVertical, Edit2 } from 'lucide-react';
 import supabaseTimestampToDate from '@/lib/supabaseDateConverter';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -30,9 +31,13 @@ import {
 import { ConversationService } from '@/lib/conversationService';
 import { useConversation } from '@/hooks/useConversation';
 import { db } from '@/lib/firebase';
-import { Timestamp } from 'firebase/firestore';
-import { CreatePollData } from '@/types/conversation';
 import { GroupChat } from '@/components/GroupChat';
+import { Trip } from '@/types/trips';
+import { getTripById } from '@/lib/tripService';
+import LimitedAction from '@/components/LimitedAction';
+import UsageIndicator from '@/components/UsageIndicator';
+import AccessRestriction from '@/components/AccessRestriction';
+import { Calendar, MapPin, Trash2 } from 'lucide-react';
 
 interface GroupUpdateData {
   name?: string;
@@ -60,6 +65,7 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
   const { groupId } = React.use(params);
   const { data: group, isLoading, error } = useGetGroupById(groupId);
   const { user: currentUser } = useAuth();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'trips' | 'settings'>('overview');
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState('');
@@ -72,8 +78,6 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
   const [conversationService] = useState(() => new ConversationService(db));
   
   // Chat state
-  const [messageInput, setMessageInput] = useState('');
-  const [groupConversationId, setGroupConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Invite members state
@@ -87,6 +91,17 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [selectedUserRole, setSelectedUserRole] = useState<"manager" | "admin" | "traveler" | ''>('');
   const [selectedUserName, setSelectedUserName] = useState<string>('');
+
+  // Trip management state
+  const [createTripDialogOpen, setCreateTripDialogOpen] = useState(false);
+  const [editTripDialogOpen, setEditTripDialogOpen] = useState(false);
+  const [deleteTripDialogOpen, setDeleteTripDialogOpen] = useState(false);
+  const [selectedTripId, setSelectedTripId] = useState<string>('');
+  const [tripName, setTripName] = useState('');
+  const [tripDescription, setTripDescription] = useState('');
+  const [tripStartDate, setTripStartDate] = useState('');
+  const [tripEndDate, setTripEndDate] = useState('');
+  const [trips, setTrips] = useState<Trip[]>([]);
 
   // Get current user's role in the group
   const currentUserRole = useMemo(() => {
@@ -125,11 +140,7 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
 
   // Use conversation hook
   const {
-    conversations,
-    messages,
-    messagesLoading,
     createConversation,
-    sendMessage,
     setCurrentConversationId,
     getConversationByGroupId
   } = useConversation({
@@ -180,6 +191,16 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
     },
   });
 
+  // Helper function to reset trip form
+  const resetTripForm = () => {
+    setTripName('');
+    setTripDescription('');
+    setTripStartDate('');
+    setTripEndDate('');
+    setSelectedTripId('');
+  };
+
+
   // Invite members mutation
   const inviteMembersMutation = useMutation({
     mutationFn: async (emails: string[]) => {
@@ -221,6 +242,45 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
     },
   });
 
+  // Create trip mutation
+  const createTripMutation = useMutation({
+    mutationFn: async (tripData: Omit<Trip, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const { createTrip } = await import('@/lib/tripService');
+      return createTrip(tripData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["group", groupId] });
+      setCreateTripDialogOpen(false);
+      resetTripForm();
+    },
+  });
+
+  // Update trip mutation
+  const updateTripMutation = useMutation({
+    mutationFn: async (tripData: Trip) => {
+      const { updateTrip } = await import('@/lib/tripService');
+      return updateTrip(tripData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["group", groupId] });
+      setEditTripDialogOpen(false);
+      resetTripForm();
+    },
+  });
+
+  // Delete trip mutation
+  const deleteTripMutation = useMutation({
+    mutationFn: async ({ groupId, tripId }: { groupId: string; tripId: string }) => {
+      const { deleteTrip } = await import('@/lib/tripService');
+      return deleteTrip(groupId, tripId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["group", groupId] });
+      setDeleteTripDialogOpen(false);
+      setSelectedTripId('');
+    },
+  });
+
   // Color options
   const colorOptions = [
     { name: "Green", value: "#6A8D73" },
@@ -239,6 +299,27 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
     { value: 'traveler', label: 'Traveler', description: 'Can view and participate in trips' },
   ];
 
+  // Load trips when group data changes
+  useEffect(() => {
+    const fetchTrips = async () => {
+      if (!group?.tripIds || group.tripIds.length === 0) {
+        setTrips([]);
+        return;
+      }
+
+      try {
+        const tripPromises = group.tripIds.map(id => getTripById(id));
+        const loadedTrips = await Promise.all(tripPromises);
+        setTrips(loadedTrips.filter(trip => trip !== null) as Trip[]);
+      } catch (error) {
+        console.error('Error loading trips:', error);
+        setTrips([]);
+      }
+    };
+
+    fetchTrips();
+  }, [group?.tripIds]);
+
   // Create or find group conversation
   useEffect(() => {
     const initializeGroupChat = async () => {
@@ -247,27 +328,25 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
       // Look for existing conversation with all group members
       const groupConversation = await getConversationByGroupId(groupId);
       if (groupConversation) {
-        setGroupConversationId(groupConversation.id);
         setCurrentConversationId(groupConversation.id);
       } else if (memberIds.length > 1) {
         // Create new group conversation
         createConversation({ id: groupId, members: memberIds })
           .then(conversationId => {
-            setGroupConversationId(conversationId);
             setCurrentConversationId(conversationId);
           })
           .catch(error => console.error('Error creating group conversation:', error));
       }
     }
     initializeGroupChat();
-  }, [currentUser, group, memberIds, createConversation, setCurrentConversationId, getConversationByGroupId]);
+  }, [currentUser, group, memberIds, groupId, createConversation, setCurrentConversationId, getConversationByGroupId]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages]);
+  });
 
   // Email validation function
   const isValidEmail = (email: string): boolean => {
@@ -389,47 +468,75 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
     setIsEditing(false);
   };
 
-  // Chat message handling
-  const handleSendMessage = async () => {
-    if (!messageInput.trim() || !groupConversationId || !currentUser) return;
 
-    try {
-      await sendMessage(groupConversationId, {
-        senderId: currentUser.uid,
-        text: messageInput.trim(),
-        type: 'text'
-      });
-      setMessageInput('');
-    } catch (error) {
-      console.error('Error sending message:', error);
-    }
-  };
-
-  const handleChatKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
-
-  const formatMessageTime = (timestamp: Timestamp) => {
-    if (!timestamp) return '';
-    const date = timestamp.toDate();
-    const now = new Date();
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-
-    if (diffInHours < 24) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } else {
-      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    }
-  };
 
   const startEditing = () => {
     setEditedName(group?.name || '');
     setSelectedIcon(group?.groupIcon || 'airplane');
     setSelectedColor(group?.groupColor || '#6A8D73');
     setIsEditing(true);
+  };
+
+  // Trip handlers
+  const handleCreateTrip = () => {
+    if (!tripName || !tripStartDate || !tripEndDate) return;
+
+    createTripMutation.mutate({
+      name: tripName,
+      description: tripDescription,
+      groupId: groupId,
+      startDate: tripStartDate,
+      endDate: tripEndDate,
+      flights: [],
+      hotels: [],
+    });
+  };
+
+  const handleEditTrip = (trip: Trip) => {
+    setSelectedTripId(trip.id || '');
+    setTripName(trip.name);
+    setTripDescription(trip.description);
+    setTripStartDate(trip.startDate);
+    setTripEndDate(trip.endDate);
+    setEditTripDialogOpen(true);
+  };
+
+  const handleUpdateTrip = () => {
+    if (!selectedTripId || !tripName || !tripStartDate || !tripEndDate) return;
+
+    updateTripMutation.mutate({
+      id: selectedTripId,
+      name: tripName,
+      description: tripDescription,
+      groupId: groupId,
+      startDate: tripStartDate,
+      endDate: tripEndDate,
+      flights: [],
+      hotels: [],
+    });
+  };
+
+  const handleDeleteTrip = (tripId: string) => {
+    setSelectedTripId(tripId);
+    setDeleteTripDialogOpen(true);
+  };
+
+  const confirmDeleteTrip = () => {
+    if (!selectedTripId) return;
+    deleteTripMutation.mutate({ groupId, tripId: selectedTripId });
+  };
+
+  const formatTripDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const handleViewTrip = (tripId: string) => {
+    router.push(`/trips/${tripId}`);
   };
 
   if (error) {
@@ -712,27 +819,76 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
           <div className='space-y-6'>
             <div className='bg-white rounded-lg shadow-sm border p-6'>
               <div className='flex items-center justify-between mb-4'>
-                <h2 className='text-xl font-semibold'>Trips ({group?.tripIds?.length || 0})</h2>
-                <button className='px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600'>
-                  Create New Trip
-                </button>
+                <h2 className='text-xl font-semibold'>Trips ({trips.length})</h2>
+                {canManageGroup && (
+                  <LimitedAction
+                    actionType="trips"
+                    onAction={() => setCreateTripDialogOpen(true)}
+                  >
+                    <Button 
+                      className='px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600'
+                    >
+                      <Plus className='h-4 w-4 mr-2' />
+                      Create New Trip
+                    </Button>
+                  </LimitedAction>
+                )}
               </div>
               <div className='space-y-4'>
-                {group?.tripIds && group.tripIds.length > 0 ? (
-                  group.tripIds.map((tripId, index) => (
-                    <div key={tripId} className='border rounded-lg p-4 hover:bg-gray-50'>
-                      <div className='flex items-center justify-between'>
-                        <div>
-                          <h3 className='font-medium'>Trip {index + 1}</h3>
-                          <p className='text-sm text-gray-500'>Trip ID: {tripId}</p>
+                {trips.length > 0 ? (
+                  trips.map((trip) => (
+                    <div 
+                      key={trip.id} 
+                      className='border rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer'
+                      onClick={() => handleViewTrip(trip.id!)}
+                    >
+                      <div className='flex items-start justify-between'>
+                        <div className='flex-1'>
+                          <h3 className='font-semibold text-lg mb-2'>{trip.name}</h3>
+                          {trip.description && (
+                            <p className='text-sm text-gray-600 mb-3'>{trip.description}</p>
+                          )}
+                          <div className='flex items-center space-x-4 text-sm text-gray-500'>
+                            <div className='flex items-center space-x-1'>
+                              <Calendar className='h-4 w-4' />
+                              <span>{formatTripDate(trip.startDate)}</span>
+                            </div>
+                            <span>-</span>
+                            <div className='flex items-center space-x-1'>
+                              <Calendar className='h-4 w-4' />
+                              <span>{formatTripDate(trip.endDate)}</span>
+                            </div>
+                          </div>
                         </div>
-                        <div className='flex items-center space-x-2'>
-                          <button className='px-3 py-1 text-sm border rounded hover:bg-gray-50'>
-                            View
-                          </button>
-                          <button className='px-3 py-1 text-sm border rounded hover:bg-gray-50'>
-                            Edit
-                          </button>
+                        <div className='flex items-center space-x-2 ml-4'>
+                          {canManageGroup && (
+                            <>
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditTrip(trip);
+                                }}
+                                variant="outline"
+                                size="sm"
+                                className='px-3 py-1 text-sm'
+                              >
+                                <Edit2 className='h-3 w-3 mr-1' />
+                                Edit
+                              </Button>
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteTrip(trip.id!);
+                                }}
+                                variant="outline"
+                                size="sm"
+                                className='px-3 py-1 text-sm text-red-600 hover:text-red-700 hover:bg-red-50'
+                              >
+                                <Trash2 className='h-3 w-3 mr-1' />
+                                Delete
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -740,13 +896,23 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
                 ) : (
                   <div className='text-center py-8 text-gray-500'>
                     <div className='mb-4'>
-                      <svg className='mx-auto h-12 w-12 text-gray-400' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
-                        <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z' />
-                        <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15 11a3 3 0 11-6 0 3 3 0 016 0z' />
-                      </svg>
+                      <MapPin className='mx-auto h-12 w-12 text-gray-400' />
                     </div>
                     <p className='text-lg font-medium'>No trips yet</p>
-                    <p className='text-sm'>Create your first trip to get started</p>
+                    <p className='text-sm mb-4'>Create your first trip to get started</p>
+                    {canManageGroup && (
+                      <LimitedAction
+                        actionType="trips"
+                        onAction={() => setCreateTripDialogOpen(true)}
+                      >
+                        <Button 
+                          className='px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600'
+                        >
+                          <Plus className='h-4 w-4 mr-2' />
+                          Create Your First Trip
+                        </Button>
+                      </LimitedAction>
+                    )}
                   </div>
                 )}
               </div>
@@ -918,12 +1084,13 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
   // Actual content when data is loaded
   return (
     <ProtectedLayout>
-      <div className='flex min-h-screen flex-col gap-6 p-4'>
+      <AccessRestriction resourceType="groups" resourceId={groupId}>
+        <div className='flex min-h-screen flex-col gap-6 p-4'>
         {/* Header */}
         <div className='space-y-2'>
           <h1 className='text-5xl font-bold'>{group?.name}</h1>
           <p className='text-gray-600'>
-            {group?.tripIds?.length || 0} trips • {Object.keys(group?.groupMembers || {}).length} members
+            {trips.length} trips • {Object.keys(group?.groupMembers || {}).length} members
           </p>
         </div>
 
@@ -963,7 +1130,7 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
               <h3 className='text-lg font-semibold mb-4'>Group Stats</h3>
               <div className='grid grid-cols-2 gap-4'>
                 <div className='text-center'>
-                  <div className='text-2xl font-bold text-blue-600'>{group?.tripIds?.length || 0}</div>
+                  <div className='text-2xl font-bold text-blue-600'>{trips.length}</div>
                   <div className='text-sm text-gray-500'>Trips</div>
                 </div>
                 <div className='text-center'>
@@ -983,13 +1150,25 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
               </div>
             </div>
 
+            {/* Usage Indicator for Free Users */}
+            <UsageIndicator className="mb-6" />
+
             {/* Quick Actions */}
             <div className='bg-white rounded-lg shadow-sm border p-6'>
               <h3 className='text-lg font-semibold mb-4'>Quick Actions</h3>
               <div className='space-y-2'>
-                <button className='w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 cursor-pointer'>
-                  Create New Trip
-                </button>
+                {canManageGroup && (
+                  <LimitedAction
+                    actionType="trips"
+                    onAction={() => setCreateTripDialogOpen(true)}
+                  >
+                    <button 
+                      className='w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 cursor-pointer'
+                    >
+                      Create New Trip
+                    </button>
+                  </LimitedAction>
+                )}
                 {canManageGroup && (
                   <button 
                     onClick={() => setInviteDialogOpen(true)}
@@ -998,14 +1177,15 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
                     Invite Members
                   </button>
                 )}
-                <button className='w-full px-4 py-2 border border-gray-300 rounde bg-gray-100 hover:bg-gray-200 cursor-pointer'>
+                <button className='w-full px-4 py-2 border border-gray-300 rounded bg-gray-100 hover:bg-gray-200 cursor-pointer'>
                   Share Group
                 </button>
               </div>
             </div>
           </div>
         </div>
-      </div>
+        </div>
+      </AccessRestriction>
 
       {/* Invite Members Dialog */}
       <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
@@ -1132,6 +1312,204 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
               className="bg-blue-500 text-white hover:bg-blue-600"
             >
               {changeRoleMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Trip Dialog */}
+      <Dialog open={createTripDialogOpen} onOpenChange={setCreateTripDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Create New Trip</DialogTitle>
+            <DialogDescription>
+              Add a new trip to your group. All group members will be able to see and participate.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="tripName" className="block text-sm font-medium text-gray-700 mb-1">
+                Trip Name *
+              </label>
+              <Input
+                id="tripName"
+                value={tripName}
+                onChange={(e) => setTripName(e.target.value)}
+                placeholder="e.g., Summer Vacation 2025"
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="tripDescription" className="block text-sm font-medium text-gray-700 mb-1">
+                Description
+              </label>
+              <textarea
+                id="tripDescription"
+                value={tripDescription}
+                onChange={(e) => setTripDescription(e.target.value)}
+                placeholder="Add details about your trip..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="tripStartDate" className="block text-sm font-medium text-gray-700 mb-1">
+                  Start Date *
+                </label>
+                <Input
+                  id="tripStartDate"
+                  type="date"
+                  value={tripStartDate}
+                  onChange={(e) => setTripStartDate(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="tripEndDate" className="block text-sm font-medium text-gray-700 mb-1">
+                  End Date *
+                </label>
+                <Input
+                  id="tripEndDate"
+                  type="date"
+                  value={tripEndDate}
+                  onChange={(e) => setTripEndDate(e.target.value)}
+                  min={tripStartDate}
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="flex justify-between">
+            <Button variant="outline" onClick={() => {
+              setCreateTripDialogOpen(false);
+              resetTripForm();
+            }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateTrip}
+              disabled={!tripName || !tripStartDate || !tripEndDate || createTripMutation.isPending}
+              className="bg-blue-500 text-white hover:bg-blue-600"
+            >
+              {createTripMutation.isPending ? "Creating..." : "Create Trip"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Trip Dialog */}
+      <Dialog open={editTripDialogOpen} onOpenChange={setEditTripDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Trip</DialogTitle>
+            <DialogDescription>
+              Update the details for this trip.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="editTripName" className="block text-sm font-medium text-gray-700 mb-1">
+                Trip Name *
+              </label>
+              <Input
+                id="editTripName"
+                value={tripName}
+                onChange={(e) => setTripName(e.target.value)}
+                placeholder="e.g., Summer Vacation 2025"
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="editTripDescription" className="block text-sm font-medium text-gray-700 mb-1">
+                Description
+              </label>
+              <textarea
+                id="editTripDescription"
+                value={tripDescription}
+                onChange={(e) => setTripDescription(e.target.value)}
+                placeholder="Add details about your trip..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="editTripStartDate" className="block text-sm font-medium text-gray-700 mb-1">
+                  Start Date *
+                </label>
+                <Input
+                  id="editTripStartDate"
+                  type="date"
+                  value={tripStartDate}
+                  onChange={(e) => setTripStartDate(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="editTripEndDate" className="block text-sm font-medium text-gray-700 mb-1">
+                  End Date *
+                </label>
+                <Input
+                  id="editTripEndDate"
+                  type="date"
+                  value={tripEndDate}
+                  onChange={(e) => setTripEndDate(e.target.value)}
+                  min={tripStartDate}
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="flex justify-between">
+            <Button variant="outline" onClick={() => {
+              setEditTripDialogOpen(false);
+              resetTripForm();
+            }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateTrip}
+              disabled={!tripName || !tripStartDate || !tripEndDate || updateTripMutation.isPending}
+              className="bg-blue-500 text-white hover:bg-blue-600"
+            >
+              {updateTripMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Trip Dialog */}
+      <Dialog open={deleteTripDialogOpen} onOpenChange={setDeleteTripDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Trip</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this trip? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="flex justify-between">
+            <Button variant="outline" onClick={() => {
+              setDeleteTripDialogOpen(false);
+              setSelectedTripId('');
+            }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmDeleteTrip}
+              disabled={deleteTripMutation.isPending}
+              className="bg-red-500 text-white hover:bg-red-600"
+            >
+              {deleteTripMutation.isPending ? "Deleting..." : "Delete Trip"}
             </Button>
           </DialogFooter>
         </DialogContent>

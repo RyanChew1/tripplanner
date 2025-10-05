@@ -64,7 +64,8 @@ const SignupPage = ({searchParams}: {searchParams: Promise<{isSignup: string}>})
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-300 bg-opacity-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-300 bg-opacity-50 py-12 px-4 sm:px-6 lg:px-8">
+      <h1 className="text-4xl text-blue-500 italic font-extrabold cursor-pointer" onClick={() => router.push('/')}>UNIVO</h1>
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
