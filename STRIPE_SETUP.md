@@ -1,6 +1,6 @@
 # Stripe Payment Integration Setup
 
-This guide will help you set up Stripe payment processing for your Trip Planner application.
+This guide will help you set up Stripe payment processing for your Univo application.
 
 ## Prerequisites
 

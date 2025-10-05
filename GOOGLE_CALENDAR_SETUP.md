@@ -1,12 +1,12 @@
 # Google Calendar Integration Setup
 
-This guide will help you set up Google Calendar integration for the Trip Planner application.
+This guide will help you set up Google Calendar integration for the Univo application.
 
 ## Prerequisites
 
 - A Google account
 - Access to Google Cloud Console
-- Your Trip Planner application running locally or deployed
+- Your Univo application running locally or deployed
 
 ## Step 1: Create Google Cloud Project
 
@@ -34,7 +34,7 @@ This guide will help you set up Google Calendar integration for the Trip Planner
 
 4. For the OAuth client:
    - Application type: "Web application"
-   - Name: "Trip Planner Calendar Integration"
+   - Name: "Univo Calendar Integration"
    - Authorized redirect URIs:
      - `http://localhost:3000/api/auth/callback` (for development)
      - `https://your-domain.com/api/auth/callback` (for production)
@@ -57,7 +57,7 @@ For production, update the `GOOGLE_REDIRECT_URI` to your production domain.
 
 1. Go to "APIs & Services" > "OAuth consent screen"
 2. Configure the following:
-   - App name: "Trip Planner"
+   - App name: "Univo"
    - User support email: your email
    - Developer contact: your email
    - Scopes: Add 

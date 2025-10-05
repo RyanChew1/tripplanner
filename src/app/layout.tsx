@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Trip Planner",
+  title: "Univo",
   description: "Plan your perfect trip with our travel planning app",
   icons: {
     icon: '/univo-logo.png',

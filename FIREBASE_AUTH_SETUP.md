@@ -1,4 +1,4 @@
-﻿# Trip Planner - Firebase Authentication Setup
+﻿# Univo - Firebase Authentication Setup
 
 This project includes Firebase authentication with email/password and Google sign-in capabilities.
 
