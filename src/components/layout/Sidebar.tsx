@@ -232,7 +232,7 @@ const Sidebar = () => {
   const travelIcons = new TravelIcons();
 
   if (loadingUser || loadingPinnedGroups) {
-    return <CustomLoader />;
+    return "Loading...";
   }
 
   return (
