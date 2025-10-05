@@ -1,6 +1,29 @@
 import Stripe from 'stripe';
 import { loadStripe } from '@stripe/stripe-js';
 
+// Get the application URL for redirects
+const getAppUrl = () => {
+  // In production, use NEXT_PUBLIC_APP_URL if set
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL;
+  }
+  
+  // In Vercel, use VERCEL_URL
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  
+  // In other deployments, try to construct from headers or use default
+  if (process.env.NODE_ENV === 'production') {
+    // For production deployments, you should set NEXT_PUBLIC_APP_URL
+    console.warn('NEXT_PUBLIC_APP_URL not set in production. Please set this environment variable.');
+    return 'https://your-domain.com'; // Replace with your actual domain
+  }
+  
+  // Development fallback
+  return 'http://localhost:3000';
+};
+
 // Check if Stripe is properly configured
 const isStripeConfigured = () => {
   return !!(process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
@@ -97,8 +120,8 @@ export async function createCheckoutSession(customerId: string, priceId: string,
         },
       ],
       mode: 'subscription',
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/billing?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/billing?payment=cancelled`,
+      success_url: `${getAppUrl()}/billing?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${getAppUrl()}/billing?payment=cancelled`,
       metadata: {
         userId,
       },

@@ -58,8 +58,8 @@ export function useUserLimits() {
   const canCreateGroup = groupCount < currentLimits.maxGroups;
   const canCreateTrip = tripCount < currentLimits.maxTrips;
 
-  const groupLimitReached = !canCreateGroup && userTier === 'free';
-  const tripLimitReached = !canCreateTrip && userTier === 'free';
+  const groupLimitReached = groupCount > currentLimits.maxGroups && userTier === 'free';
+  const tripLimitReached = tripCount > currentLimits.maxTrips && userTier === 'free';
 
   return {
     isLoading,
