@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Calendar, Users, ArrowLeft, Edit2, Trash2, Plus, Clock, Plane, Hotel, Image } from 'lucide-react';
+import { Calendar, Users, ArrowLeft, Edit2, Trash2, Plus, Clock, Plane, Hotel, Image, CalendarDays } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { getUserById } from '@/lib/userService';
 import { User } from '@/types/users';
@@ -34,6 +34,8 @@ import TripHotelSearch from '@/components/booking/TripHotelSearch';
 import AccessRestriction from '@/components/AccessRestriction';
 import AlbumView from '@/components/albums/AlbumView';
 import { useGetAlbumByTripId, useCheckAllMembersPremium } from '@/hooks/useAlbum';
+import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
+import supabaseTimestampToDate from '@/lib/supabaseDateConverter';
 
 // Custom hook to fetch multiple users
 function useGetUsersByIds(userIds: string[]) {
@@ -60,6 +62,15 @@ const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
   const { data: trip, isLoading, error } = useGetTripById(tripId);
   const { data: group } = useGetGroupById(trip?.groupId || '');
   
+  // Google Calendar integration
+  const { 
+    isConnected: isGoogleCalendarConnected, 
+    isLoading: isGoogleCalendarLoading,
+    exportTripToCalendar,
+    connectGoogleCalendar,
+    checkConnection 
+  } = useGoogleCalendar();
+  
   // Get tab from URL parameter, default to 'overview'
   const tabFromUrl = searchParams.get('tab') as 'overview' | 'itinerary' | 'flights' | 'hotels' | 'album' | 'settings' | null;
   const [activeTab, setActiveTab] = useState<'overview' | 'itinerary' | 'flights' | 'hotels' | 'album' | 'settings'>(
@@ -71,7 +82,7 @@ const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
     if (tabFromUrl && tabFromUrl !== activeTab) {
       setActiveTab(tabFromUrl);
     }
-  }, [tabFromUrl]);
+  }, [tabFromUrl, activeTab]);
   const [editTripDialogOpen, setEditTripDialogOpen] = useState(false);
   const [deleteTripDialogOpen, setDeleteTripDialogOpen] = useState(false);
   const [tripName, setTripName] = useState('');
@@ -119,6 +130,11 @@ const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
       setActiveTab(tabFromUrl);
     }
   }, [searchParams, activeTab]);
+
+  // Check Google Calendar connection on mount
+  useEffect(() => {
+    checkConnection();
+  }, [checkConnection]);
 
   // Create a map of userId to user data
   const memberMap = useMemo(() => {
@@ -384,6 +400,26 @@ const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
     setDeleteTripDialogOpen(false);
   };
 
+  // Google Calendar export handler
+  const handleExportToGoogleCalendar = async () => {
+    if (!isGoogleCalendarConnected) {
+      connectGoogleCalendar();
+      return;
+    }
+
+    try {
+      const result = await exportTripToCalendar(tripId);
+      if (result.success) {
+        alert(result.message);
+      } else {
+        alert(result.message);
+      }
+    } catch (error) {
+      console.error('Error exporting to Google Calendar:', error);
+      alert('Failed to export to Google Calendar. Please try again.');
+    }
+  };
+
   // Calendar event handlers
   const handleCreateEvent = () => {
     if (!eventTitle || !eventStartDate || !eventStartTime || !eventEndDate || !eventEndTime) return;
@@ -478,9 +514,9 @@ const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
     );
   };
 
-  const formatEventDateTime = (dateObj: { date: Date; time: string }) => {
-    const date = new Date(dateObj.date);
-    return `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at ${dateObj.time}`;
+  const formatEventDateTime = (dateObj: { date: { seconds: number; nanoseconds: number }; time: string }) => {
+    const date = supabaseTimestampToDate(dateObj.date.seconds, dateObj.date.nanoseconds);
+    return `${date} at ${dateObj.time}`;
   };
 
   const getCategoryIcon = (category: EventCategory) => {
@@ -878,9 +914,9 @@ const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
                               
                               <div className='flex items-center space-x-2 text-sm text-gray-600 mb-2'>
                                 <Clock className='h-4 w-4' />
-                                <span>{formatEventDateTime(event.startDate)}</span>
+                                <span>{formatEventDateTime(event.startDate as unknown as { date: { seconds: number; nanoseconds: number }; time: string })}</span>
                                 <span>→</span>
-                                <span>{formatEventDateTime(event.endDate)}</span>
+                                <span>{formatEventDateTime(event.endDate as unknown as { date: { seconds: number; nanoseconds: number }; time: string })}</span>
                               </div>
 
                               {event.note && (
@@ -1241,6 +1277,39 @@ const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
                 </div>
               </div>
             )}
+
+            {/* Google Calendar Export */}
+            <div className='bg-white rounded-lg shadow-sm border p-6'>
+              <h3 className='text-lg font-semibold mb-4'>Export to Calendar</h3>
+              <div className='space-y-3'>
+                <Button
+                  onClick={handleExportToGoogleCalendar}
+                  disabled={isGoogleCalendarLoading}
+                  className={`w-full px-4 py-2 rounded ${
+                    isGoogleCalendarConnected 
+                      ? 'bg-green-500 text-white hover:bg-green-600' 
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                >
+                  <CalendarDays className='h-4 w-4 mr-2' />
+                  {isGoogleCalendarLoading 
+                    ? 'Exporting...' 
+                    : isGoogleCalendarConnected 
+                      ? 'Export to Google Calendar' 
+                      : 'Connect Google Calendar'
+                  }
+                </Button>
+                {isGoogleCalendarConnected && (
+                  <p className='text-sm text-green-600 flex items-center'>
+                    <CalendarDays className='h-4 w-4 mr-1' />
+                    Connected to Google Calendar
+                  </p>
+                )}
+                <p className='text-xs text-gray-500'>
+                  Export all trip events, flights, and hotels to your Google Calendar
+                </p>
+              </div>
+            </div>
           </div>
         </div>
         </div>

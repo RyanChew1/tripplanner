@@ -19,4 +19,8 @@ export interface User {
     pinnedGroups: string[];
     stripeCustomerId?: string;
     subscriptionId?: string;
+    // Google Calendar integration
+    googleCalendarAccessToken?: string;
+    googleCalendarRefreshToken?: string;
+    googleCalendarTokenExpiry?: Date;
 }

@@ -1,6 +1,7 @@
 import Stripe from 'stripe';
 import { loadStripe } from '@stripe/stripe-js';
 
+
 // Get the application URL for redirects
 const getAppUrl = () => {
   // In production, use NEXT_PUBLIC_APP_URL if set
@@ -140,6 +141,40 @@ export async function getSubscription(subscriptionId: string) {
   try {
     const subscription = await stripe!.subscriptions.retrieve(subscriptionId);
     return subscription;
+  } catch (error) {
+    console.error('Error retrieving subscription:', error);
+    throw error;
+  }
+}
+
+// Get subscription period details
+export async function getSubscriptionPeriod(subscriptionId: string) {
+  checkStripeConfig();
+  
+  try {
+    const subscription = await stripe!.subscriptions.retrieve(subscriptionId) as unknown as Record<string, unknown>;
+
+    const currentPeriodStart = subscription.current_period_start as number; // Unix timestamp in seconds
+    const currentPeriodEnd = subscription.current_period_end as number;   // Unix timestamp in seconds
+
+    // Convert to Date objects for easier manipulation (optional)
+    const startDate = new Date(currentPeriodStart * 1000); // Multiply by 1000 for milliseconds
+    const endDate = new Date(currentPeriodEnd * 1000);
+
+    console.log('Current Period Start:', startDate.toLocaleString());
+    console.log('Current Period End:', endDate.toLocaleString());
+
+    // Calculate days remaining
+    const daysRemaining = Math.ceil((currentPeriodEnd * 1000 - Date.now()) / (1000 * 60 * 60 * 24));
+
+    return { 
+      startDate, 
+      endDate,
+      currentPeriodStart,
+      currentPeriodEnd,
+      daysRemaining,
+      subscription
+    };
   } catch (error) {
     console.error('Error retrieving subscription:', error);
     throw error;

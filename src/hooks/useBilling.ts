@@ -139,3 +139,22 @@ export async function redirectToCheckout(sessionId: string) {
   // For server-side redirects, use window.location
   window.location.href = `/api/stripe/checkout?session_id=${sessionId}`;
 }
+
+// Get subscription period details
+export function useSubscriptionPeriod(subscriptionId: string | undefined) {
+  return useQuery({
+    queryKey: ['subscription-period', subscriptionId],
+    queryFn: async () => {
+      if (!subscriptionId) throw new Error('Subscription ID is required');
+      
+      const response = await fetch(`/api/stripe/subscription-period?subscriptionId=${subscriptionId}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch subscription period');
+      }
+      
+      return response.json();
+    },
+    enabled: !!subscriptionId,
+  });
+}

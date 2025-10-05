@@ -24,6 +24,18 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 
+// Type for Stripe subscription data that can have either snake_case or camelCase fields
+type StripeSubscription = {
+  id: string;
+  status: string;
+  current_period_start?: number;
+  current_period_end?: number;
+  cancel_at_period_end?: boolean;
+  currentPeriodStart?: number;
+  currentPeriodEnd?: number;
+  cancelAtPeriodEnd?: boolean;
+};
+
 const SettingsPage = () => {
   const { user: firebaseUser } = useAuth()
   const { data: user, isLoading: userLoading } = useGetUser(firebaseUser?.uid || '')
@@ -351,7 +363,7 @@ const SettingsPage = () => {
                           </div>
                           <div className="flex justify-between text-sm">
                             <span className="text-gray-600">Next Billing:</span>
-                            <span>{formatDate(billingInfo.subscription.currentPeriodEnd)}</span>
+                            <span>{(billingInfo.subscription as StripeSubscription).current_period_end ? formatDate((billingInfo.subscription as StripeSubscription).current_period_end) : 'N/A'}</span>
                           </div>
                         </div>
                       )}

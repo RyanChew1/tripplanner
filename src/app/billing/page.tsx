@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGetUser } from '@/hooks/useUser';
 import { updateUser } from '@/lib/userService';
-import { useBillingInfo, useCancelSubscription, useReactivateSubscription } from '@/hooks/useBilling';
+import { useBillingInfo, useCancelSubscription, useReactivateSubscription, useSubscriptionPeriod } from '@/hooks/useBilling';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +15,29 @@ import { format } from 'date-fns';
 import ProtectedLayout from '@/components/layout/ProtectedLayout';
 import SubscriptionPrompt from '@/components/SubscriptionPrompt';
 
+// Type for Stripe subscription data that can have either snake_case or camelCase fields
+type StripeSubscription = {
+  id: string;
+  status: string;
+  current_period_start?: number;
+  current_period_end?: number;
+  cancel_at_period_end?: boolean;
+  currentPeriodStart?: number;
+  currentPeriodEnd?: number;
+  cancelAtPeriodEnd?: boolean;
+};
+
+// Type for Stripe invoice data
+type StripeInvoice = {
+  id: string;
+  number?: string;
+  status: string;
+  amount_paid?: number;
+  amountPaid?: number;
+  currency: string;
+  created: number;
+};
+
 export default function BillingPage() {
   const { user: firebaseUser } = useAuth();
   const { data: user } = useGetUser(firebaseUser?.uid || '');
@@ -24,6 +47,9 @@ export default function BillingPage() {
   const [isSubscriptionPromptOpen, setIsSubscriptionPromptOpen] = useState(false);
 
   const { data: billingInfo, isLoading: billingLoading, error: billingError } = useBillingInfo(user?.stripeCustomerId);
+  console.log('billingInfo', billingInfo);
+  
+  const { data: subscriptionPeriod } = useSubscriptionPeriod(billingInfo?.subscription?.id);
   
   const cancelSubscriptionMutation = useCancelSubscription();
   const reactivateSubscriptionMutation = useReactivateSubscription();
@@ -143,11 +169,18 @@ export default function BillingPage() {
     }
   };
 
-  const formatCurrency = (amount: number, currency: string = 'usd') => {
+  const formatCurrency = (amount: number | undefined | null, currency: string = 'usd') => {
+    if (!amount || isNaN(amount)) {
+      return 'N/A';
+    }
+    
+    // Stripe amounts are in cents, so divide by 100
+    const formattedAmount = amount / 100;
+    
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency.toUpperCase(),
-    }).format(amount / 100);
+    }).format(formattedAmount);
   };
 
   if (billingLoading) {
@@ -225,18 +258,12 @@ export default function BillingPage() {
                       )}
                     </div>
                     
-                    {billingInfo?.subscription && billingInfo.subscription.currentPeriodStart && billingInfo.subscription.currentPeriodEnd && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {billingInfo?.subscription && subscriptionPeriod?.subscription?.billing_cycle_anchor && (
+                      <div className="grid grid-cols-1 gap-4">
                         <div>
-                          <p className="text-sm text-gray-600">Current Period</p>
+                          <p className="text-sm text-gray-600">Billing Cycle Anchor</p>
                           <p className="font-medium">
-                            {formatDate(billingInfo.subscription.currentPeriodStart)} - {formatDate(billingInfo.subscription.currentPeriodEnd)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600">Next Billing Date</p>
-                          <p className="font-medium">
-                            {formatDate(billingInfo.subscription.currentPeriodEnd)}
+                            {formatDate(subscriptionPeriod.subscription.billing_cycle_anchor)}
                           </p>
                         </div>
                       </div>
@@ -244,14 +271,14 @@ export default function BillingPage() {
 
                     {billingInfo?.subscription && (
                       <>
-                        {billingInfo.subscription.cancelAtPeriodEnd ? (
+                        {((billingInfo.subscription as StripeSubscription).cancel_at_period_end || billingInfo.subscription.cancelAtPeriodEnd) ? (
                           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                             <div className="flex items-center gap-2 mb-2">
                               <AlertCircle className="w-4 h-4 text-yellow-600" />
                               <span className="font-medium text-yellow-800">Subscription will be canceled</span>
                             </div>
                             <p className="text-yellow-700 text-sm mb-3">
-                              Your subscription will end on {billingInfo.subscription.currentPeriodEnd ? formatDate(billingInfo.subscription.currentPeriodEnd) : 'the end of the current period'}. 
+                              Your subscription will end on {((billingInfo.subscription as StripeSubscription).current_period_end || billingInfo.subscription.currentPeriodEnd) ? formatDate((billingInfo.subscription as StripeSubscription).current_period_end || billingInfo.subscription.currentPeriodEnd) : 'the end of the current period'}. 
                               You&apos;ll continue to have access until then.
                             </p>
                             <Button 
@@ -344,17 +371,17 @@ export default function BillingPage() {
               <CardContent>
                 {billingInfo?.invoices && billingInfo.invoices.length > 0 ? (
                   <div className="space-y-4">
-                    {billingInfo?.invoices.map((invoice) => (
+                    {billingInfo?.invoices.map((invoice: StripeInvoice) => (
                       <div key={invoice.id} className="flex items-center justify-between p-4 border rounded-lg">
                         <div>
-                          <p className="font-medium">Invoice #{invoice.number}</p>
+                          <p className="font-medium">Invoice #{invoice.number || invoice.id}</p>
                           <p className="text-sm text-gray-600">
                             {formatDate(invoice.created)}
                           </p>
                         </div>
                         <div className="text-right">
                           <p className="font-medium">
-                            {formatCurrency(invoice.amountPaid, invoice.currency)}
+                            {formatCurrency(invoice.amount_paid || invoice.amountPaid, invoice.currency)}
                           </p>
                           <Badge variant={invoice.status === 'paid' ? 'default' : 'secondary'}>
                             {invoice.status}

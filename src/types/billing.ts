@@ -11,6 +11,7 @@ export interface Subscription {
   priceId: string;
   productId: string;
   createdAt: number;
+  billingCycleAnchor?: number;
 }
 
 export interface Customer {
