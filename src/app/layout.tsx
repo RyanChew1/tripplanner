@@ -17,6 +17,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Trip Planner",
   description: "Plan your perfect trip with our travel planning app",
+  icons: {
+    icon: '/univo-logo.png',
+    shortcut: '/univo-logo.png',
+    apple: '/univo-logo.png',
+  },
 };
 
 export default function RootLayout({
