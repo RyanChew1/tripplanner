@@ -4,10 +4,10 @@ import ProtectedLayout from '@/components/layout/ProtectedLayout';
 import { useGetTripById } from '@/hooks/useTrip';
 import { useGetGroupById } from '@/hooks/useGroups';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
-import React, { useState, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Calendar, Users, ArrowLeft, Edit2, Trash2, Plus, Clock, Plane, Hotel } from 'lucide-react';
+import { Calendar, Users, ArrowLeft, Edit2, Trash2, Plus, Clock, Plane, Hotel, Image } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { getUserById } from '@/lib/userService';
 import { User } from '@/types/users';
@@ -32,6 +32,8 @@ import { Input } from '@/components/ui/input';
 import TripFlightSearch from '@/components/booking/TripFlightSearch';
 import TripHotelSearch from '@/components/booking/TripHotelSearch';
 import AccessRestriction from '@/components/AccessRestriction';
+import AlbumView from '@/components/albums/AlbumView';
+import { useGetAlbumByTripId, useCheckAllMembersPremium } from '@/hooks/useAlbum';
 
 // Custom hook to fetch multiple users
 function useGetUsersByIds(userIds: string[]) {
@@ -51,13 +53,25 @@ function useGetUsersByIds(userIds: string[]) {
 const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
   const { tripId } = React.use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   
   const { data: trip, isLoading, error } = useGetTripById(tripId);
   const { data: group } = useGetGroupById(trip?.groupId || '');
   
-  const [activeTab, setActiveTab] = useState<'overview' | 'itinerary' | 'flights' | 'hotels' | 'settings'>('overview');
+  // Get tab from URL parameter, default to 'overview'
+  const tabFromUrl = searchParams.get('tab') as 'overview' | 'itinerary' | 'flights' | 'hotels' | 'album' | 'settings' | null;
+  const [activeTab, setActiveTab] = useState<'overview' | 'itinerary' | 'flights' | 'hotels' | 'album' | 'settings'>(
+    tabFromUrl || 'overview'
+  );
+
+  // Sync activeTab with URL changes
+  React.useEffect(() => {
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
   const [editTripDialogOpen, setEditTripDialogOpen] = useState(false);
   const [deleteTripDialogOpen, setDeleteTripDialogOpen] = useState(false);
   const [tripName, setTripName] = useState('');
@@ -91,6 +105,20 @@ const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
 
   // Fetch user data for all members
   const { data: members = [] } = useGetUsersByIds(memberIds);
+
+  // Check if all members are premium for album access
+  const { data: isAllMembersPremium = false } = useCheckAllMembersPremium(memberIds);
+
+  // Get album for this trip
+  const { data: album } = useGetAlbumByTripId(tripId);
+
+  // Handle URL parameter changes
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab') as 'overview' | 'itinerary' | 'flights' | 'hotels' | 'album' | 'settings' | null;
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [searchParams, activeTab]);
 
   // Create a map of userId to user data
   const memberMap = useMemo(() => {
@@ -1073,6 +1101,20 @@ const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
           </div>
         );
 
+      case 'album':
+        return (
+          <div className='space-y-6'>
+            <div className='bg-white rounded-lg shadow-sm border p-6'>
+              <h2 className='text-xl font-semibold mb-4'>Trip Album</h2>
+              <AlbumView 
+                albumId={album?.albumId || tripId} 
+                tripId={tripId}
+                isAllMembersPremium={isAllMembersPremium}
+              />
+            </div>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -1114,13 +1156,24 @@ const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
             { id: 'itinerary', label: 'Itinerary' },
             { id: 'flights', label: 'Flights', icon: Plane },
             { id: 'hotels', label: 'Hotels', icon: Hotel },
+            { id: 'album', label: 'Album', icon: Image },
             { id: 'settings', label: 'Settings' }
           ].map((tab) => {
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as 'overview' | 'itinerary' | 'flights' | 'hotels' | 'settings')}
+                onClick={() => {
+                  const newTab = tab.id as 'overview' | 'itinerary' | 'flights' | 'hotels' | 'album' | 'settings';
+                  setActiveTab(newTab);
+                  
+                  // Only clear URL parameter if it exists, otherwise just update the state
+                  if (tabFromUrl) {
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('tab');
+                    router.replace(url.pathname + url.search);
+                  }
+                }}
                 className={`flex items-center space-x-2 px-4 py-2 font-medium transition-colors ${
                   activeTab === tab.id
                     ? 'border-b-2 border-blue-500 text-blue-600'

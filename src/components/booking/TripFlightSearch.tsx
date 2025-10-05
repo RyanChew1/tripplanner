@@ -260,12 +260,6 @@ export default function TripFlightSearch({ tripId, tripStartDate, tripEndDate, g
                 <div className="flex space-x-2 mt-2">
                   <Button 
                     size="sm" 
-                    className="bg-blue-500 hover:bg-blue-600 text-white"
-                  >
-                    Select Flight
-                  </Button>
-                  <Button 
-                    size="sm" 
                     variant="outline"
                     onClick={() => handleSaveFlight(offer)}
                     disabled={savedFlights.has(offer.id) || addFlight.isPending}

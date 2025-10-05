@@ -19,7 +19,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { X, Plus, MoreVertical, Edit2 } from 'lucide-react';
+import { X, Plus, MoreVertical, Edit2, Image } from 'lucide-react';
 import supabaseTimestampToDate from '@/lib/supabaseDateConverter';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -38,6 +38,8 @@ import LimitedAction from '@/components/LimitedAction';
 import UsageIndicator from '@/components/UsageIndicator';
 import AccessRestriction from '@/components/AccessRestriction';
 import { Calendar, MapPin, Trash2 } from 'lucide-react';
+import AlbumCard from '@/components/albums/AlbumCard';
+import { useGetAlbumsByGroupId, useCheckAllMembersPremium } from '@/hooks/useAlbum';
 
 interface GroupUpdateData {
   name?: string;
@@ -66,7 +68,7 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
   const { data: group, isLoading, error } = useGetGroupById(groupId);
   const { user: currentUser } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'trips' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'trips' | 'albums' | 'settings'>('overview');
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('');
@@ -126,6 +128,23 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
 
   // Fetch user data for all members
   const { data: members = [] } = useGetUsersByIds(memberIds);
+
+  // Check if all members are premium for album access
+  const { data: isAllMembersPremium = false } = useCheckAllMembersPremium(memberIds);
+
+  // Get albums for all trips in this group
+  const { data: albums = [] } = useGetAlbumsByGroupId(groupId, group?.tripIds || []);
+
+  // Create a map of tripId to trip data for album cards
+  const tripMap = useMemo(() => {
+    const map = new Map<string, Trip>();
+    trips.forEach(trip => {
+      if (trip.id) {
+        map.set(trip.id, trip);
+      }
+    });
+    return map;
+  }, [trips]);
 
   // Create a map of userId to user data for easy lookup
   const memberMap = useMemo(() => {
@@ -1076,6 +1095,44 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
           </div>
         );
 
+      case 'albums':
+        return (
+          <div className='space-y-6'>
+            <div className='bg-white rounded-lg shadow-sm border p-6'>
+              <h2 className='text-xl font-semibold mb-4'>Trip Albums</h2>
+              {albums.length === 0 ? (
+                <div className='flex flex-col items-center justify-center py-12'>
+                  <Image className='h-16 w-16 text-gray-400 mb-4' />
+                  <h3 className='text-lg font-semibold text-gray-900 mb-2'>
+                    No albums yet
+                  </h3>
+                  <p className='text-gray-600 text-center max-w-md'>
+                    {isAllMembersPremium 
+                      ? 'Create trips and start uploading photos to see albums here.'
+                      : 'All users need premium plan to use photo albums.'
+                    }
+                  </p>
+                </div>
+              ) : (
+                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+                  {albums.map((album) => {
+                    const trip = tripMap.get(album.tripId);
+                    return (
+                      <AlbumCard
+                        key={album.albumId}
+                        album={album}
+                        photos={[]} // We'll need to fetch photos for each album
+                        tripName={trip?.name || 'Unknown Trip'}
+                        isAllMembersPremium={isAllMembersPremium}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -1100,20 +1157,25 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
             { id: 'overview', label: 'Overview' },
             { id: 'members', label: 'Members' },
             { id: 'trips', label: 'Trips' },
+            { id: 'albums', label: 'Albums', icon: Image },
             { id: 'settings', label: 'Settings' }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as 'overview' | 'members' | 'trips' | 'settings')}
-              className={`px-4 py-2 font-medium transition-colors ${
-                activeTab === tab.id
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+          ].map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as 'overview' | 'members' | 'trips' | 'albums' | 'settings')}
+                className={`flex items-center space-x-2 px-4 py-2 font-medium transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-b-2 border-blue-500 text-blue-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                {Icon && <Icon className="h-4 w-4" />}
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Main Content */}
@@ -1177,9 +1239,7 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
                     Invite Members
                   </button>
                 )}
-                <button className='w-full px-4 py-2 border border-gray-300 rounded bg-gray-100 hover:bg-gray-200 cursor-pointer'>
-                  Share Group
-                </button>
+
               </div>
             </div>
           </div>
