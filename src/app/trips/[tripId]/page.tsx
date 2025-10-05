@@ -68,7 +68,8 @@ const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
     isLoading: isGoogleCalendarLoading,
     exportTripToCalendar,
     connectGoogleCalendar,
-    checkConnection 
+    checkConnection,
+    refreshConnection
   } = useGoogleCalendar();
   
   // Get tab from URL parameter, default to 'overview'
@@ -131,9 +132,22 @@ const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
     }
   }, [searchParams, activeTab]);
 
-  // Check Google Calendar connection on mount
+  // Check Google Calendar connection on mount and when URL changes (OAuth callback)
   useEffect(() => {
     checkConnection();
+  }, [checkConnection]);
+
+  // Check for OAuth success in URL parameters
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('success') === 'google_calendar_connected') {
+      // Refresh connection status after successful OAuth
+      checkConnection();
+      // Clean up URL parameter
+      const url = new URL(window.location.href);
+      url.searchParams.delete('success');
+      window.history.replaceState({}, '', url.toString());
+    }
   }, [checkConnection]);
 
   // Create a map of userId to user data
@@ -400,23 +414,38 @@ const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
     setDeleteTripDialogOpen(false);
   };
 
+  // Google Calendar export state
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [exportSuccess, setExportSuccess] = useState<boolean | null>(null);
+
   // Google Calendar export handler
   const handleExportToGoogleCalendar = async () => {
+    console.log('Export button clicked. Connection status:', isGoogleCalendarConnected);
+    
     if (!isGoogleCalendarConnected) {
+      console.log('Not connected, initiating OAuth flow');
       connectGoogleCalendar();
       return;
     }
 
+    console.log('Connected, proceeding with export');
+    setExportMessage(null);
+    setExportSuccess(null);
+    
     try {
       const result = await exportTripToCalendar(tripId);
       if (result.success) {
-        alert(result.message);
+        setExportMessage(result.message);
+        setExportSuccess(true);
       } else {
-        alert(result.message);
+        console.log('Export failed:', result.message);
+        setExportMessage(result.message);
+        setExportSuccess(false);
       }
     } catch (error) {
       console.error('Error exporting to Google Calendar:', error);
-      alert('Failed to export to Google Calendar. Please try again.');
+      setExportMessage('Failed to export to Google Calendar. Please try again.');
+      setExportSuccess(false);
     }
   };
 
@@ -443,12 +472,64 @@ const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
     createEventMutation.mutate(eventData);
   };
 
+  // Helper function to convert Firestore Timestamp to Date string
+  const convertFirestoreTimestampToDateString = (timestamp: any): string => {
+    if (timestamp && typeof timestamp === 'object') {
+      // Handle Firestore Timestamp format
+      if (timestamp.seconds !== undefined && timestamp.nanoseconds !== undefined) {
+        const totalMilliseconds = (timestamp.seconds * 1000) + (timestamp.nanoseconds / 1_000_000);
+        return new Date(totalMilliseconds).toISOString().split('T')[0];
+      }
+      // Handle regular Date object
+      if (timestamp instanceof Date) {
+        return timestamp.toISOString().split('T')[0];
+      }
+      // Handle date string
+      if (typeof timestamp === 'string') {
+        return new Date(timestamp).toISOString().split('T')[0];
+      }
+    }
+    // Fallback: try to create a Date from whatever we have
+    try {
+      return new Date(timestamp).toISOString().split('T')[0];
+    } catch (error) {
+      console.error('Error converting timestamp to date:', error, timestamp);
+      return new Date().toISOString().split('T')[0]; // Fallback to today's date
+    }
+  };
+
+  // Helper function to convert Firestore Timestamp to Date object for comparison
+  const convertFirestoreTimestampToDate = (timestamp: any): Date => {
+    if (timestamp && typeof timestamp === 'object') {
+      // Handle Firestore Timestamp format
+      if (timestamp.seconds !== undefined && timestamp.nanoseconds !== undefined) {
+        const totalMilliseconds = (timestamp.seconds * 1000) + (timestamp.nanoseconds / 1_000_000);
+        return new Date(totalMilliseconds);
+      }
+      // Handle regular Date object
+      if (timestamp instanceof Date) {
+        return timestamp;
+      }
+      // Handle date string
+      if (typeof timestamp === 'string') {
+        return new Date(timestamp);
+      }
+    }
+    // Fallback: try to create a Date from whatever we have
+    try {
+      return new Date(timestamp);
+    } catch (error) {
+      console.error('Error converting timestamp to date:', error, timestamp);
+      return new Date(); // Fallback to current date
+    }
+  };
+
   const handleEditEvent = (event: CalendarEvent) => {
     setSelectedEventId(event.id || '');
     setEventTitle(event.title);
-    setEventStartDate(new Date(event.startDate.date).toISOString().split('T')[0]);
+    setEventStartDate(convertFirestoreTimestampToDateString(event.startDate.date));
     setEventStartTime(event.startDate.time);
-    setEventEndDate(new Date(event.endDate.date).toISOString().split('T')[0]);
+    setEventEndDate(convertFirestoreTimestampToDateString(event.endDate.date));
     setEventEndTime(event.endDate.time);
     setEventNote(event.note || '');
     setEventLocationId(event.locationId);
@@ -741,7 +822,7 @@ const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
                                       <p className='text-lg font-bold text-green-600'>
                                         {offer.price.currency} {offer.price.total}
                                       </p>
-                                      <p className='text-sm text-gray-500'>total</p>
+                                      <p className='text-sm text-gray-500'>per night</p>
                                     </div>
                                   </div>
                                 </div>
@@ -888,7 +969,7 @@ const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
               ) : filteredEvents.length > 0 ? (
                 <div className='space-y-3'>
                   {filteredEvents
-                    .sort((a, b) => new Date(a.startDate.date).getTime() - new Date(b.startDate.date).getTime())
+                    .sort((a, b) => convertFirestoreTimestampToDate(a.startDate.date).getTime() - convertFirestoreTimestampToDate(b.startDate.date).getTime())
                     .map(event => {
                       const eventMembers = event.memberIds
                         .map(id => memberMap.get(id))
@@ -1281,14 +1362,24 @@ const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
 
             {/* Google Calendar Export */}
             <div className='bg-white rounded-lg shadow-sm border p-6'>
-              <h3 className='text-lg font-semibold mb-4'>Export to Calendar</h3>
+              <div className='flex items-center justify-between mb-4'>
+                <h3 className='text-lg font-semibold'>Export to Calendar</h3>
+                <Button
+                  onClick={refreshConnection}
+                  variant="outline"
+                  size="sm"
+                  className='text-xs'
+                >
+                  Refresh
+                </Button>
+              </div>
               <div className='space-y-3'>
                 <Button
                   onClick={handleExportToGoogleCalendar}
                   disabled={isGoogleCalendarLoading}
                   className={`w-full px-4 py-2 rounded ${
                     isGoogleCalendarConnected 
-                      ? 'bg-green-500 text-white hover:bg-green-600' 
+                      ? 'bg-green_primary text-white hover:bg-green_primary/60' 
                       : 'bg-blue-500 text-white hover:bg-blue-600'
                   }`}
                 >
@@ -1306,6 +1397,24 @@ const TripPage = ({ params }: { params: Promise<{ tripId: string }> }) => {
                     Connected to Google Calendar
                   </p>
                 )}
+                
+                {/* Export Status Message */}
+                {exportMessage && (
+                  <div className={`p-3 rounded-lg text-sm ${
+                    exportSuccess === true 
+                      ? 'bg-green-50 text-green-700 border border-green-200' 
+                      : exportSuccess === false 
+                        ? 'bg-red-50 text-red-700 border border-red-200'
+                        : 'bg-blue-50 text-blue-700 border border-blue-200'
+                  }`}>
+                    <div className='flex items-center'>
+                      {exportSuccess === true && <CalendarDays className='h-4 w-4 mr-2' />}
+                      {exportSuccess === false && <span className='mr-2'>⚠️</span>}
+                      <span>{exportMessage}</span>
+                    </div>
+                  </div>
+                )}
+                
                 <p className='text-xs text-gray-500'>
                   Export all trip events, flights, and hotels to your Google Calendar
                 </p>

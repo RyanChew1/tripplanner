@@ -27,15 +27,17 @@ This guide will help you set up Google Calendar integration for the Trip Planner
 3. If prompted, configure the OAuth consent screen first:
    - Choose "External" user type
    - Fill in required fields (App name, User support email, Developer contact)
-   - Add scopes: `https://www.googleapis.com/auth/calendar.events`
+   - Add scopes: 
+     - `https://www.googleapis.com/auth/calendar.events`
+     - `https://www.googleapis.com/auth/calendar.readonly`
    - Add test users if needed
 
 4. For the OAuth client:
    - Application type: "Web application"
    - Name: "Trip Planner Calendar Integration"
    - Authorized redirect URIs:
-     - `http://localhost:3000/api/auth/google/callback` (for development)
-     - `https://your-domain.com/api/auth/google/callback` (for production)
+     - `http://localhost:3000/api/auth/callback` (for development)
+     - `https://your-domain.com/api/auth/callback` (for production)
 
 5. Click "Create" and save the Client ID and Client Secret
 
@@ -46,7 +48,7 @@ Add these variables to your `.env.local` file:
 ```env
 GOOGLE_CLIENT_ID=your_client_id_here
 GOOGLE_CLIENT_SECRET=your_client_secret_here
-GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
+GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/callback
 ```
 
 For production, update the `GOOGLE_REDIRECT_URI` to your production domain.
@@ -58,7 +60,9 @@ For production, update the `GOOGLE_REDIRECT_URI` to your production domain.
    - App name: "Trip Planner"
    - User support email: your email
    - Developer contact: your email
-   - Scopes: Add `https://www.googleapis.com/auth/calendar.events`
+   - Scopes: Add 
+     - `https://www.googleapis.com/auth/calendar.events`
+     - `https://www.googleapis.com/auth/calendar.readonly`
    - Test users: Add any test accounts that will use the app during development
 
 ## Step 6: Verify Setup

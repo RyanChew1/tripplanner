@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserById } from '@/lib/userService';
-import { hasValidTokens } from '@/lib/googleCalendarService';
+import { testGoogleCalendarConnection } from '@/lib/googleCalendarService';
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,12 +22,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user has valid Google Calendar tokens
-    const connected = hasValidTokens(user);
+    // Check if user has Google Calendar tokens
+    const hasTokens = !!(user.googleCalendarAccessToken && user.googleCalendarRefreshToken);
+    
+    if (!hasTokens) {
+      return NextResponse.json({
+        connected: false,
+        hasTokens: false,
+      });
+    }
 
+    // Test the connection with a real API call
+    const connectionTest = await testGoogleCalendarConnection(user);
+    
     return NextResponse.json({
-      connected,
-      hasTokens: !!(user.googleCalendarAccessToken && user.googleCalendarRefreshToken),
+      connected: connectionTest.connected,
+      hasTokens: true,
+      error: connectionTest.error,
     });
   } catch (error) {
     console.error('Error checking Google Calendar status:', error);

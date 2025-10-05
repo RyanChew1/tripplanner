@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { exportTripToGoogleCalendar, hasValidTokens, refreshUserTokens } from '@/lib/googleCalendarService';
+import { exportTripToGoogleCalendar, testGoogleCalendarConnection } from '@/lib/googleCalendarService';
 import { getTripById } from '@/lib/tripService';
 import { getCalendarEvents } from '@/lib/calendarService';
 import { getUserById } from '@/lib/userService';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 
 export async function POST(
   request: NextRequest,
@@ -38,26 +38,9 @@ export async function POST(
       );
     }
 
-    // Check if tokens are valid, refresh if needed
-    let currentUser = user;
-    if (!hasValidTokens(user)) {
-      try {
-        const refreshedTokens = await refreshUserTokens(user);
-        // Update user with new tokens
-        const userRef = doc(db, 'users', userId);
-        await updateDoc(userRef, {
-          googleCalendarAccessToken: refreshedTokens.accessToken,
-          googleCalendarRefreshToken: refreshedTokens.refreshToken,
-          googleCalendarTokenExpiry: refreshedTokens.expiryDate,
-        });
-        currentUser = { ...user, ...refreshedTokens };
-      } catch (error) {
-        return NextResponse.json(
-          { error: 'Failed to refresh Google Calendar tokens', needsAuth: true },
-          { status: 401 }
-        );
-      }
-    }
+    // Skip the connection test here since it's causing sync issues
+    // The exportTripToGoogleCalendar function will handle token validation
+    console.log('Skipping connection test in export API, proceeding directly to export');
 
     // Get trip data
     const trip = await getTripById(tripId);
@@ -92,7 +75,7 @@ export async function POST(
 
     // Export to Google Calendar
     const result = await exportTripToGoogleCalendar(
-      currentUser,
+      user,
       trip,
       calendarEvents,
       trip.flights || [],

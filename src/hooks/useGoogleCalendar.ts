@@ -9,6 +9,7 @@ interface UseGoogleCalendarReturn {
   exportTripToCalendar: (tripId: string) => Promise<{ success: boolean; message: string; eventsCreated?: number }>;
   disconnectGoogleCalendar: () => Promise<void>;
   checkConnection: () => Promise<void>;
+  refreshConnection: () => Promise<void>;
 }
 
 export function useGoogleCalendar(): UseGoogleCalendarReturn {
@@ -34,8 +35,15 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('Google Calendar connection status:', data);
         setIsConnected(data.connected);
+        
+        // If we have tokens but connection failed, log the error
+        if (data.hasTokens && !data.connected && data.error) {
+          console.warn('Google Calendar connection failed:', data.error);
+        }
       } else {
+        console.error('Failed to check Google Calendar status:', response.status);
         setIsConnected(false);
       }
     } catch (error) {
@@ -65,6 +73,7 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
       return { success: false, message: 'User not authenticated' };
     }
 
+    console.log('Starting export process. Current connection status:', isConnected);
     setIsLoading(true);
     setError(null);
 
@@ -78,18 +87,28 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
       });
 
       const data = await response.json();
+      console.log('Export API response:', { status: response.status, data });
 
       if (response.ok) {
+        // Refresh connection status after successful export
+        checkConnection();
         return {
           success: true,
           message: data.message || `Successfully added ${data.eventsCreated} events to your Google Calendar`,
           eventsCreated: data.eventsCreated,
         };
       } else {
+        console.log('Export failed with status:', response.status, data);
         if (data.needsAuth) {
-          // User needs to authenticate with Google Calendar
+          console.log('API indicates needsAuth, but frontend thinks we\'re connected. This suggests a sync issue.');
+          // Refresh connection status to sync with backend
+          console.log('Refreshing connection status due to sync issue...');
+          await checkConnection();
+          
+          // Redirect to OAuth to refresh tokens
+          console.log('Redirecting to OAuth to refresh tokens');
           connectGoogleCalendar();
-          return { success: false, message: 'Please connect to Google Calendar first' };
+          return { success: false, message: 'Please reconnect to Google Calendar to refresh your access tokens.' };
         }
         
         return {
@@ -141,6 +160,11 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
     }
   }, [user?.uid]);
 
+  const refreshConnection = useCallback(async (): Promise<void> => {
+    console.log('Manually refreshing Google Calendar connection status');
+    await checkConnection();
+  }, [checkConnection]);
+
   return {
     isConnected,
     isLoading,
@@ -149,5 +173,6 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
     exportTripToCalendar,
     disconnectGoogleCalendar,
     checkConnection,
+    refreshConnection,
   };
 }
