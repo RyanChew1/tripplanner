@@ -10,7 +10,7 @@ export default function CustomLoader({ size = 240 }) {
     >
       {/* Optional: Circle track (uncomment to show the path) */}
       <div
-        className="absolute border border-gray-200 rounded-full opacity-30"
+        // className="absolute border border-gray-200 rounded-full opacity-30"
         style={{
           width: size,
           height: size,
