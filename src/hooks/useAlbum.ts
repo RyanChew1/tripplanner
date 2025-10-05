@@ -41,6 +41,37 @@ export function useGetPhotos(albumId: string, options?: { enabled?: boolean }) {
   });
 }
 
+// Hook to get photos for multiple albums
+export function useGetPhotosForAlbums(albumIds: string[]) {
+  return useQuery({
+    queryKey: ['photos', 'multiple', albumIds],
+    queryFn: async () => {
+      if (albumIds.length === 0) return {};
+      
+      const photoPromises = albumIds.map(async (albumId) => {
+        try {
+          const photos = await getPhotos(albumId);
+          return { albumId, photos };
+        } catch (error) {
+          console.error(`Error fetching photos for album ${albumId}:`, error);
+          return { albumId, photos: [] };
+        }
+      });
+      
+      const results = await Promise.all(photoPromises);
+      const photosMap: Record<string, any[]> = {};
+      
+      results.forEach(({ albumId, photos }) => {
+        photosMap[albumId] = photos;
+      });
+      
+      return photosMap;
+    },
+    enabled: albumIds.length > 0,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+}
+
 // Hook to check if all group members are premium
 export function useCheckAllMembersPremium(memberIds: string[]) {
   return useQuery({

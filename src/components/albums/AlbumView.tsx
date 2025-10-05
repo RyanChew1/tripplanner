@@ -13,7 +13,12 @@ import {
   Loader2,
   AlertCircle,
   Search,
-  X as XIcon
+  X as XIcon,
+  Share2,
+  Instagram,
+  MessageCircle,
+  Copy,
+  ExternalLink
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGetPhotos, useUploadPhoto, useDeletePhoto } from '@/hooks/useAlbum';
@@ -45,7 +50,10 @@ export default function AlbumView({ albumId, tripId, isAllMembersPremium }: Albu
   });
   
   // If no album exists yet, we'll show empty state until upload creates one
-  const allPhotos = (isAlbumCreated || actualAlbumId) ? photos : [];
+  const allPhotos = useMemo(() => {
+    return (isAlbumCreated || actualAlbumId) ? photos : [];
+  }, [isAlbumCreated, actualAlbumId, photos]);
+  
   const isLoading = (isAlbumCreated || actualAlbumId) ? photosLoading : false;
   
   // Filter photos by caption search query
@@ -131,6 +139,219 @@ export default function AlbumView({ albumId, tripId, isAllMembersPremium }: Albu
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // Sharing functionality
+  const handleDownloadPhoto = async (photo: Photo) => {
+    try {
+      // Method 1: Try to fetch and download the image as a blob
+      try {
+        const response = await fetch(photo.imageUrl, {
+          mode: 'cors',
+          credentials: 'omit',
+          headers: {
+            'Accept': 'image/*'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const blob = await response.blob();
+        
+        // Create a download link with the blob
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `trip-photo-${photo.photoId}.jpg`;
+        link.style.display = 'none';
+        
+        // Add to DOM, click, and remove
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up the blob URL
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url);
+        }, 100);
+        
+        return;
+      } catch (fetchError) {
+        console.warn('Direct fetch failed, trying alternative method:', fetchError);
+      }
+
+      // Method 2: Try using Firebase Storage download URL with proper parameters
+      try {
+        let downloadUrl = photo.imageUrl;
+        
+        // For Firebase Storage URLs, try different download approaches
+        if (photo.imageUrl.includes('firebasestorage.googleapis.com')) {
+          // Try adding download parameters for Firebase Storage
+          const url = new URL(photo.imageUrl);
+          url.searchParams.set('alt', 'media');
+          url.searchParams.set('dl', '1'); // Force download
+          downloadUrl = url.toString();
+        }
+        
+        const response = await fetch(downloadUrl, {
+          method: 'GET',
+          mode: 'cors',
+          headers: {
+            'Accept': 'image/*',
+            'Cache-Control': 'no-cache'
+          }
+        });
+        
+        if (response.ok) {
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `trip-photo-${photo.photoId}.jpg`;
+          link.style.display = 'none';
+          
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+          }, 100);
+          
+          return;
+        }
+      } catch (proxyError) {
+        console.warn('Firebase Storage method failed:', proxyError);
+      }
+
+      // Method 3: Try using a more direct approach with proper download attributes
+      try {
+        // Create a temporary link with download attribute
+        const link = document.createElement('a');
+        link.href = photo.imageUrl;
+        link.download = `trip-photo-${photo.photoId}.jpg`;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.style.display = 'none';
+        
+        // Add to DOM, trigger click, and remove
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Also try with a small delay to ensure the download starts
+        setTimeout(() => {
+          // If the above didn't work, try opening in new tab as fallback
+          const newWindow = window.open(photo.imageUrl, '_blank');
+          if (newWindow) {
+            setTimeout(() => {
+              newWindow.close();
+            }, 2000);
+          }
+        }, 100);
+        
+        return;
+      } catch (directError) {
+        console.warn('Direct download method failed:', directError);
+      }
+
+      // Method 4: Final fallback - open in new tab with download instructions
+      const newWindow = window.open(photo.imageUrl, '_blank');
+      if (newWindow) {
+        // Show instructions for manual download
+        setTimeout(() => {
+          alert('Image opened in new tab. Right-click on the image and select "Save image as..." to download it to your device.');
+        }, 1000);
+      } else {
+        throw new Error('Unable to open image');
+      }
+      
+    } catch (error) {
+      console.error('Error downloading photo:', error);
+      // Final fallback - show user instructions
+      alert(`Unable to download automatically. Please:\n\n1. Right-click on the image and select "Save image as..."\n2. Or copy this URL and paste it in a new tab: ${photo.imageUrl}`);
+    }
+  };
+
+  const handleCopyLink = async (photo: Photo) => {
+    try {
+      await navigator.clipboard.writeText(photo.imageUrl);
+      alert('Photo link copied to clipboard!');
+    } catch (error) {
+      console.error('Error copying link:', error);
+      // Fallback for older browsers or when clipboard API fails
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = photo.imageUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        if (successful) {
+          alert('Photo link copied to clipboard!');
+        } else {
+          throw new Error('Copy command failed');
+        }
+      } catch (fallbackError) {
+        console.error('Fallback copy failed:', fallbackError);
+        // Final fallback - show the URL to the user
+        const userConfirmed = confirm(`Unable to copy to clipboard automatically. The photo URL is:\n\n${photo.imageUrl}\n\nClick OK to select and copy it manually.`);
+        if (userConfirmed) {
+          const textArea = document.createElement('textarea');
+          textArea.value = photo.imageUrl;
+          textArea.style.position = 'fixed';
+          textArea.style.left = '50%';
+          textArea.style.top = '50%';
+          textArea.style.transform = 'translate(-50%, -50%)';
+          textArea.style.zIndex = '9999';
+          textArea.style.width = '300px';
+          textArea.style.height = '100px';
+          document.body.appendChild(textArea);
+          textArea.focus();
+          textArea.select();
+          setTimeout(() => {
+            document.body.removeChild(textArea);
+          }, 5000);
+        }
+      }
+    }
+  };
+
+  const handleInstagramShare = () => {
+    // Instagram doesn't support direct URL sharing, so we'll open Instagram in a new tab
+    // Users can then manually upload the photo
+    window.open('https://www.instagram.com/', '_blank');
+  };
+
+  const handleNativeShare = async (photo: Photo) => {
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Trip Photo',
+          text: photo.caption || 'Check out this photo from my trip!',
+          url: photo.imageUrl,
+        });
+      } catch (error) {
+        console.error('Error sharing:', error);
+      }
+    } else {
+      // Fallback to copy link
+      handleCopyLink(photo);
+    }
+  };
+
+  const handleMessagesShare = (photo: Photo) => {
+    // For mobile devices, this will open the default messaging app
+    const text = encodeURIComponent(photo.caption ? `Check out this photo: ${photo.caption}` : 'Check out this photo from my trip!');
+    const url = encodeURIComponent(photo.imageUrl);
+    window.open(`sms:?body=${text}%20${url}`, '_blank');
   };
 
   if (!isAllMembersPremium) {
@@ -282,21 +503,37 @@ export default function AlbumView({ albumId, tripId, isAllMembersPremium }: Albu
                   onClick={() => setSelectedPhoto(photo)}
                 />
                 
-                {/* Delete button for photo owner */}
-                {photo.ownerId === currentUser?.uid && (
+                {/* Action buttons */}
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
+                  {/* Share button for all users */}
                   <Button
                     size="sm"
-                    variant="destructive"
-                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                    variant="secondary"
+                    className="text-white bg-black bg-opacity-50 hover:bg-opacity-70"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleDeletePhoto(photo);
+                      setSelectedPhoto(photo);
                     }}
-                    disabled={deletePhotoMutation.isPending}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Share2 className="h-4 w-4" />
                   </Button>
-                )}
+                  
+                  {/* Delete button for photo owner */}
+                  {photo.ownerId === currentUser?.uid && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="text-white"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeletePhoto(photo);
+                      }}
+                      disabled={deletePhotoMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
               
               {photo.caption && (
@@ -344,6 +581,80 @@ export default function AlbumView({ albumId, tripId, isAllMembersPremium }: Albu
                 {selectedPhoto.fileSize && (
                   <span>{formatFileSize(selectedPhoto.fileSize)}</span>
                 )}
+              </div>
+
+              {/* Sharing Buttons */}
+              <div className="mt-6 border-t pt-4">
+                <h4 className="text-sm font-medium text-gray-900 mb-3">Share this photo</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {/* Native Share (Mobile) */}
+                  {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleNativeShare(selectedPhoto)}
+                      className="flex items-center space-x-2"
+                    >
+                      <Share2 className="h-4 w-4" />
+                      <span>Share</span>
+                    </Button>
+                  )}
+                  
+                  {/* Download */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownloadPhoto(selectedPhoto)}
+                    className="flex items-center space-x-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span>Download</span>
+                  </Button>
+                  
+                  {/* Copy Link */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCopyLink(selectedPhoto)}
+                    className="flex items-center space-x-2"
+                  >
+                    <Copy className="h-4 w-4" />
+                    <span>Copy Link</span>
+                  </Button>
+                  
+                  {/* Instagram */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleInstagramShare()}
+                    className="flex items-center space-x-2"
+                  >
+                    <Instagram className="h-4 w-4" />
+                    <span>Instagram</span>
+                  </Button>
+                  
+                  {/* Messages */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleMessagesShare(selectedPhoto)}
+                    className="flex items-center space-x-2"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    <span>Messages</span>
+                  </Button>
+                  
+                  {/* Open in New Tab */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(selectedPhoto.imageUrl, '_blank')}
+                    className="flex items-center space-x-2"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    <span>Open</span>
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

@@ -55,6 +55,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({
     sendMessage,
     createConversation,
     createPoll,
+    voteOnPoll,
     removeVoteFromPoll,
     getConversationByGroupId,
     setCurrentConversationId
@@ -138,6 +139,16 @@ export const GroupChat: React.FC<GroupChatProps> = ({
     }
   };
 
+
+  const handleVoteOnPoll = async (messageId: string, optionId: string) => {
+    if (!conversationId) return;
+
+    try {
+      await voteOnPoll(conversationId, messageId, optionId);
+    } catch (error) {
+      console.error('Error voting on poll:', error);
+    }
+  };
 
   const handleRemoveVote = async (messageId: string) => {
     if (!conversationId) return;
@@ -273,9 +284,10 @@ export const GroupChat: React.FC<GroupChatProps> = ({
                                   ? 'bg-blue-400 border-blue-300 text-white' 
                                   : 'bg-blue-50 border-blue-300 text-blue-900'
                                 : isCurrentUser
-                                  ? 'border-blue-300 hover:bg-blue-400 text-white'
-                                  : 'border-gray-300 hover:bg-gray-50 text-gray-900'
+                                  ? 'border-blue-300 hover:bg-blue-400 text-white cursor-pointer'
+                                  : 'border-gray-300 hover:bg-gray-50 text-gray-900 cursor-pointer'
                           } ${isExpired ? 'opacity-75' : ''}`}
+                          onClick={!isExpired ? () => handleVoteOnPoll(message.id, option.id) : undefined}
                         >
                           <div className="flex justify-between items-center">
                             <div className="flex items-center space-x-2">
@@ -416,7 +428,8 @@ export const GroupChat: React.FC<GroupChatProps> = ({
                       isExpired && isWinner
                         ? 'bg-yellow-50 border-yellow-300'
                         : 'bg-gray-50 border-gray-200'
-                    }`}>
+                    } ${!isExpired ? 'cursor-pointer hover:bg-gray-100' : ''}`}
+                    onClick={!isExpired ? () => handleVoteOnPoll(message.id, option.id) : undefined}>
                       <div className="flex justify-between items-center">
                         <div className="flex items-center space-x-2">
                           {isExpired && (

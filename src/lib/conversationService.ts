@@ -8,6 +8,7 @@
   orderBy, 
   serverTimestamp,
   writeBatch,
+  getDoc,
   Firestore,
   getDocs,
   where,
@@ -180,13 +181,14 @@ export class ConversationService {
    */
   private async getMessageById(conversationId: string, messageId: string): Promise<Message | null> {
     try {
-      const messageDoc = await getDocs(query(collection(this.db, 'conversations', conversationId, 'messages'), where('__name__', '==', messageId)));
+      const messageRef = doc(this.db, 'conversations', conversationId, 'messages', messageId);
+      const messageDoc = await getDoc(messageRef);
       
-      if (messageDoc.empty) return null;
+      if (!messageDoc.exists()) return null;
       
       return {
-        id: messageDoc.docs[0].id,
-        ...messageDoc.docs[0].data()
+        id: messageDoc.id,
+        ...messageDoc.data()
       } as Message;
     } catch (error) {
       console.error('Error getting message:', error);

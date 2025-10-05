@@ -39,7 +39,7 @@ import UsageIndicator from '@/components/UsageIndicator';
 import AccessRestriction from '@/components/AccessRestriction';
 import { Calendar, MapPin, Trash2 } from 'lucide-react';
 import AlbumCard from '@/components/albums/AlbumCard';
-import { useGetAlbumsByGroupId, useCheckAllMembersPremium } from '@/hooks/useAlbum';
+import { useGetAlbumsByGroupId, useCheckAllMembersPremium, useGetPhotosForAlbums } from '@/hooks/useAlbum';
 
 interface GroupUpdateData {
   name?: string;
@@ -134,6 +134,12 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
 
   // Get albums for all trips in this group
   const { data: albums = [] } = useGetAlbumsByGroupId(groupId, group?.tripIds || []);
+  
+  // Get album IDs for fetching photos
+  const albumIds = albums.map(album => album.albumId);
+  
+  // Fetch photos for all albums
+  const { data: photosMap = {} } = useGetPhotosForAlbums(albumIds);
 
   // Create a map of tripId to trip data for album cards
   const tripMap = useMemo(() => {
@@ -1117,11 +1123,12 @@ const Page = ({ params }: { params: Promise<{ groupId: string }> }) => {
                 <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
                   {albums.map((album) => {
                     const trip = tripMap.get(album.tripId);
+                    const photos = photosMap[album.albumId] || [];
                     return (
                       <AlbumCard
                         key={album.albumId}
                         album={album}
-                        photos={[]} // We'll need to fetch photos for each album
+                        photos={photos}
                         tripName={trip?.name || 'Unknown Trip'}
                         isAllMembersPremium={isAllMembersPremium}
                       />
